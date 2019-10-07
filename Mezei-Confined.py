@@ -136,7 +136,6 @@ def Random_Excluded_Volume(h, L, x, y, z):
                 Delta_y = y_V - y[j]
                 Delta_y = PeriodicBoundaryConditions(L, Delta_y)
                 Delta_z = z_V - z[j]
-                Delta_z = PeriodicBoundaryConditions(L, Delta_z)
                 r2 = pow(Delta_x, 2) + pow(Delta_y, 2) + pow(Delta_z, 2)
                 if r2 < pow(0.7, 2):
                     break
@@ -146,4 +145,22 @@ def Random_Excluded_Volume(h, L, x, y, z):
                     y_Insertion.append(y_V)
                     z_Insertion.append(z_V)
     Volume_Ratio = N_in / N_Random
-    return Volume_Ratio, x_Insertion, y_Insertion, z_Insertion
+    return Volume_Ratio, x_Insertion, y_Insertion, 
+    
+
+        Density_z = [(z_Bins * x) / (N_Measurements * V) for x in Density_z]
+    Density_z_File = open("%s/Density_z.dat" % Output_Route, "w+")
+    for i in range(len(Density_z)):
+        Density_z_File.write("%.6f\t%.6f\n" % ((h - 1) * (i / z_Bins + (1 / z_Bins - 1) / 2), Density_z[i]))
+    Density_z_File.close()
+
+
+    def z_Distribution(z, z_Bins, h, Density_z):
+    z_sorted = z.copy()
+    z_sorted.sort()
+    Delta = (h - 1) / z_Bins
+    for i in range(z_Bins):
+        A = [x >= i * Delta - (h - 1) / 2 for x in z_sorted]
+        B = [x <= (i + 1) * Delta - (h - 1) / 2 for x in z_sorted]
+        Density_z[i] += np.sum(np.logical_and(A, B))
+    return Density_z

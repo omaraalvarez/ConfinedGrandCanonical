@@ -20,10 +20,10 @@ from timeit import default_timer as timer
 def Mezei(ChemPot, h, L, T, R_Cut = 3.0):
     start = timer()
     """     CONFIGURATIONAL     STEPS           """
-    MC_Relaxation_Steps = 15000
-    MC_Equilibrium_Steps = 50000
+    MC_Relaxation_Steps = 100000
+    MC_Equilibrium_Steps = 5000000
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps
-    MC_Measurement = 10
+    MC_Measurement = 100
     """     VARIABLE    INITIALIZATION         """
     x, y, z = [], [], []
     V = h * pow(L, 2)
@@ -47,9 +47,11 @@ def Mezei(ChemPot, h, L, T, R_Cut = 3.0):
     print("#" * 40)
 
     """       OUTPUT      ROUTES       """
-    Output_Route = "Output/ChPot_%.3f_h_%.2f_T_%.2f" % (ChemPot, h, T)
+    Output_Route = "Output/ChPot_%.3f_h_%.2f_L_%.2f_T_%.2f" % (ChemPot, h, L, T)
     if not os.path.exists(Output_Route):
         os.makedirs(Output_Route)
+    if not os.path.exists("%s/Positions" % Output_Route):
+        os.makedirs("%s/Positions" % Output_Route)
     Average_Energy_File = open("%s/Average_Energy.dat" % Output_Route, "w+")
     Average_Energy_File.write("#\t< E / N >\n")
     #Average_Pressure_File = open("%s/Average_Pressure.dat" % Output_Route, "w+")
@@ -102,6 +104,11 @@ def Mezei(ChemPot, h, L, T, R_Cut = 3.0):
 
         if i == MC_Relaxation_Steps:
             print("~~~  STARTING MEASUREMENT STEPS  ~~~")
+            Pc_File = open("%s/Pc_Relaxation.dat" % Output_Route, "w+")
+            Pc_File.write("#N\t#Pc\n" )
+            for i in Pc_Random:
+                Pc_File.write("%d\t%.6f\n" % (i, Pc_Random[i]))
+            Pc_File.close()
 
         RN = randrange(1, 4)
         """     EQUAL PROBABILITY FOR PARTICLE MOVEMENT, INSERTION OR DELETION      """
@@ -158,10 +165,15 @@ def Mezei(ChemPot, h, L, T, R_Cut = 3.0):
                     #g_x = Distribution(x, Bins, L, g_x)
                     #g_y = Distribution(y, Bins, L, g_y)
                     #g_z = Distribution(z, Bins, h, g_z)
-                    g_x += Distribution(Bins, L, h, mean(Density_Array), x)
-                    g_y += Distribution(Bins, L, h, mean(Density_Array), y)
-                    g_z += Distribution(Bins, h, L, mean(Density_Array), z)
+                    g_x += Distribution(Bins, L, mean(Density_Array), x)
+                    g_y += Distribution(Bins, L, mean(Density_Array), y)
+                    g_z += Distribution(Bins, h, mean(Density_Array), z)
                     N_Measurements += 1
+                    Positions_File = open("%s/Positions/Pos_%d.xyz" % (Output_Route, N_Measurements), "w+")
+                    for i in range(len(x) - 1):
+                        Positions_File.write("%.6f,\t%.6f,\t%.6f,\n" % (x[i], y[i], z[i]))
+                    Positions_File.write("%.6f,\t%.6f,\t%.6f\n" % (x[i], y[i], z[i]))
+                    Positions_File.close()
                 """ PARTICLE DISPLACEMENT """
                 if fmod(i, 100*MC_Measurement) == 0:
                     if 1. * N_Displacement_Accepted / N_Displacement > 0.55:
@@ -185,28 +197,25 @@ def Mezei(ChemPot, h, L, T, R_Cut = 3.0):
     Pc_File.close()
 
     """     Z DISTRIBUTION OUTPUT      """
-    N_Measurements = 1
-    g_x = [ x / N_Measurements for x in g_x]
-    Delta = h / Bins
+    g_x = [Bins * x / (N_Measurements * V) for x in g_x]
+    Delta = L / Bins
     g_x_File = open("%s/Density_x.dat" % Output_Route, "w+")
     for i in range(Bins):
-        g_x_File.write( "%.6f\t%.6f\n" % (- h / 2 + (i + 0.5) * Delta, g_x[Bins - (i + 1)]) )
+        g_x_File.write( "%.6f\t%.6f\n" % (- L / 2 + (i + 0.5) * Delta, g_x[Bins - (i + 1)]) )
     g_x_File.close()
 
-    g_y = [ x / N_Measurements for x in g_y]
-    Delta = h / Bins
+    g_y = [Bins * x / (N_Measurements * V) for x in g_y]
+    Delta = L / Bins
     g_y_File = open("%s/Density_y.dat" % Output_Route, "w+")
     for i in range(Bins):
-        g_y_File.write( "%.6f\t%.6f\n" % (- h / 2 + (i + 0.5) * Delta, g_y[Bins - (i + 1)]) )
+        g_y_File.write( "%.6f\t%.6f\n" % (- L / 2 + (i + 0.5) * Delta, g_y[Bins - (i + 1)]) )
     g_y_File.close()
 
-    g_z = [ x / N_Measurements for x in g_z]
+    g_z = [Bins * x / (N_Measurements * V) for x in g_z]
     Delta = h / Bins
     g_z_File = open("%s/Density_z.dat" % Output_Route, "w+")
     for i in range(Bins):
         g_z_File.write( "%.6f\t%.6f\n" % (- h / 2 + (i + 0.5) * Delta, g_z[Bins - (i + 1)]) )
-    #for i in range(len(g_z)):
-        #g_z_File.write("%.6f\t%.6f\n" % (h * (i / z_Bins + (1 / z_Bins - 1) / 2), g_z[i]))
     g_z_File.close()
 
     print("< E / N > = %.6f + %.6f" % (mean(Energy_Array), pstdev(Energy_Array)) )
@@ -229,26 +238,26 @@ def Mezei(ChemPot, h, L, T, R_Cut = 3.0):
     print("Elapsed time: %f s" % dt)
 
 def Random_Excluded_Volume(h, L, x, y, z):
-    N_Random = 1000
+    N_Random = 200
     N_in = 0
     x_Insertion, y_Insertion, z_Insertion = [], [], []
     if not len(x) > 1:
         for _ in range(N_Random):
-            x_V = L*(random() - 0.5)
-            y_V = L*(random() - 0.5)
             z_V = h*(random() - 0.5)
             if h / 2 - abs(z_V) > 0.5:
                 N_in += 1
+                x_V = L*(random() - 0.5)
+                y_V = L*(random() - 0.5)
                 x_Insertion.append(x_V)
                 y_Insertion.append(y_V)
                 z_Insertion.append(z_V)
     else:
         for _ in range(N_Random):
-            x_V = L*(random() - 0.5)
-            y_V = L*(random() - 0.5)
             z_V = h*(random() - 0.5)
             if h / 2 - abs(z_V) > 0.5:
                 for j in range(len(x)):
+                    x_V = L*(random() - 0.5)
+                    y_V = L*(random() - 0.5)
                     Delta_x = x_V - x[j]
                     Delta_x = PeriodicBoundaryConditions(L, Delta_x)
                     Delta_y = y_V - y[j]
@@ -357,8 +366,11 @@ def u_ParticleWall(h, z):
     """     SQUARE WELL POTENTIAL       """
     if Delta_z <= 0.5:
         return inf
-    elif Delta_z <= 1:
+    elif Delta_z <= 1.5:#h / 2:
+        #if z > 0:
         return -1
+        #else:
+        #    return 1
     else:
         return 0 
 
@@ -387,6 +399,7 @@ def Energy_Calculation(h, L, R_Cut, rx, ry, rz, x, y, z):
     return Energy
 
 def Interpolation(Pc, l):
+    """     LINEAR INTERPOLATION BY TAKING THE PREVIOUS AND FOLLOWING VALUE """
     if len(Pc) == 1:
         Pc_Interpolation =  Pc[ list( Pc.keys() )[0] ]
     elif len(Pc) > 1:
@@ -406,26 +419,14 @@ def Interpolation(Pc, l):
     Pc_Interpolation = Pc[lim_inf] * ((1 - l - lim_inf) / (lim_sup - lim_inf)) + Pc[lim_sup] * ((l - lim_inf) / (lim_sup - lim_inf))
     return Pc_Interpolation
 
-#def Distribution(z, z_Bins, h, g_z):
-#    z_sorted = z.copy()
-#    z_sorted.sort()
-#    Delta = h / z_Bins
-#    for i in range(z_Bins):
-#        A = [x >= i * Delta - h / 2 for x in z_sorted]
-#        B = [x <= (i + 1) * Delta - h / 2 for x in z_sorted]
-#        g_z[i] += np.sum(np.logical_and(A, B))
-#        
-#    return g_z
-
-def Distribution(Bins, h, L, Density, z):
+def Distribution(Bins, h, Density, z):
     Delta = h / Bins
     g_z = np.zeros(Bins, dtype = float)
     for i in range( len(z) ): 
         l = int( (h / 2 - z[i]) / Delta) - 1
         g_z[l] += 1
-    for l in range(Bins):
-        g_z[l] = g_z[l] / ( len(z) * Density * pow(L, 2) * h * Delta)
+    #for l in range(Bins):
+    #    g_z[l] = g_z[l] / ( len(z) )
     return g_z
 
-
-Mezei(-3.0, 10.0, 12.0, 2.0)
+Mezei(-3.0, 10.0, 5., 2.0)

@@ -5,9 +5,9 @@ using Test;
 function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
     """     CONFIGURATIONAL STEPS       """
     MC_Relaxation_Steps = 250_000;
-    MC_Equilibrium_Steps = 1_000_000;
+    MC_Equilibrium_Steps = 5_000_000;
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps;
-    MC_Measurement = 50;
+    MC_Measurement = 5000;
     """     VARIABLE INITIALIZATION     """
     Overlap = 1.0;
     x, y, z = Float64[], Float64[], Float64[];
@@ -44,15 +44,15 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     σ_p, λ_p = 0.5, 1.5;
     σ_w, λ_w = 0.5, 1.5;
     N_Slates = convert(Int64, ceil((λ_w - σ_w) / σ_w));
-    N = convert(Int64, floor(L / (2σ_w))) + 3;
-    η = convert(Int64, floor(λ_w))
+    #N = convert(Int64, floor(L / (2σ_w))) + 3;
+    N = convert(Int64, floor(L / (2σ_w))) + 2N_Slates + 1;
     File_Slates_Avogadro = open("$Output_Route/Slate_Avogadro.xyz", "w")
     File_Slates = open("$Output_Route/Positions/Slate.xyz", "w")
     println(File_Slates_Avogadro, "$(N_Slates * N^2)\n")
     for i = 1:N_Slates
         if isodd(i)
-            rx = -L / 2 - 2σ_w;
-            ry = -L / 2 - 2σ_w;
+            rx = -L / 2 - 2σ_w*N_Slates;
+            ry = -L / 2 - 2σ_w*N_Slates;
             rz = h / 2 + i*σ_w;
             for i_x = 1:N
                 for i_y = 1:N
@@ -60,12 +60,12 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
                     i_x == N && i_y == N ? println(File_Slates, "$rx,\t$ry,\t$rz") : println(File_Slates, "$rx,\t$ry,\t$rz,")
                     ry += 2σ_w;
                 end
-                ry = - L / 2 - 2σ_w;
+                ry = - L / 2 - 2σ_w*N_Slates;
                 rx += 2σ_w;
             end
         else 
-            rx = -L / 2 - 3σ_w
-            ry = -L / 2 - 3σ_w
+            rx = -L / 2 - 3σ_w*N_Slates;
+            ry = -L / 2 - 3σ_w*N_Slates;
             rz = h / 2 + i*σ_w;
             for i_x = 1:N
                 for i_y = 1:N
@@ -73,7 +73,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
                     i_x == N && i_y == N ? println(File_Slates, "$rx,\t$ry,\t$rz") : println(File_Slates, "$rx,\t$ry,\t$rz,")
                     ry += 2σ_w;
                 end
-                ry = - L / 2 - 3σ_w;
+                ry = - L / 2 - 3σ_w*N_Slates;
                 rx += 2σ_w;
             end
         end
@@ -405,8 +405,8 @@ function Energy_Calculation(h::Float64, L::Float64, R_Cut::Float64, σ_p::Float6
     N = convert(Int64, floor(L / (2σ_w))) + 3;
     for i = 1:N_Slates
         if isodd(i)
-            x_wall = -L / 2 - 2σ_w;
-            y_wall = -L / 2 - 2σ_w;
+            x_wall = -L / 2 - 2σ_w*N_Slates;
+            y_wall = -L / 2 - 2σ_w*N_Slates;
             z_wall = h / 2 + i*σ_w;
             for i_x = 1:N
                 for i_y = 1:N
@@ -418,12 +418,12 @@ function Energy_Calculation(h::Float64, L::Float64, R_Cut::Float64, σ_p::Float6
                     Energy == Inf ? (return Energy) : nothing
                     y_wall += 2σ_w;
                 end
-                y_wall = - L / 2 - 2σ_w;
+                y_wall = - L / 2 - 2σ_w*N_Slates;
                 x_wall += 2σ_w;
             end
         else 
-            x_wall = -L / 2 - 3σ_w
-            y_wall = -L / 2 - 3σ_w
+            x_wall = -L / 2 - 3σ_w*N_Slates;
+            y_wall = -L / 2 - 3σ_w*N_Slates;
             z_wall = h / 2 + i*σ_w;
             for i_x = 1:N
                 for i_y = 1:N
@@ -435,7 +435,7 @@ function Energy_Calculation(h::Float64, L::Float64, R_Cut::Float64, σ_p::Float6
                     Energy == Inf ? (return Energy) : nothing
                     y_wall += 2σ_w;
                 end
-                y_wall = - L / 2 - 3σ_w;
+                y_wall = - L / 2 - 3σ_w*N_Slates;
                 x_wall += 2σ_w;
             end
         end
@@ -619,14 +619,14 @@ end
 function Potential(N_Bins::Int64, L::Float64, h::Float64, σ_w::Float64, λ_w::Float64, N_Slates::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
     Delta = h / N_Bins;
     PotentialFunction = zeros(Float64, N_Bins);
-    N = convert(Int64, floor(h / (2σ_w))) + 3;
+    N = convert(Int64, floor(L / (2σ_w))) + 2N_Slates + 1;
     for i = 1:length(x)
         l = convert(Int64, ceil( (h / 2. - z[i]) / Delta) )
         Energy = 0;
         for j = 1:N_Slates
             if isodd(j)
-                x_wall = -L / 2 - 2σ_w;
-                y_wall = -L / 2 - 2σ_w;
+                x_wall = -L / 2 - 2σ_w*N_Slates;
+                y_wall = -L / 2 - 2σ_w*N_Slates;
                 z_wall = h / 2 + j*σ_w;
                 for i_x = 1:N
                     for i_y = 1:N
@@ -634,18 +634,16 @@ function Potential(N_Bins::Int64, L::Float64, h::Float64, σ_w::Float64, λ_w::F
                         Delta_y = y_wall - y[i];
                         Delta_z = z_wall - abs(z[i]);
                         r2 = Delta_x^2 + Delta_y^2 + Delta_z^2;
-                        if r2 <= λ_w^2
-                            Energy += u_SquareWell(r2, σ_w, λ_w);
-                        end
-                        #Energy == Inf ? error("Particle inside infinite potential") : nothing
+                        Energy += u_SquareWell(r2, σ_w, λ_w);
+                        Energy == Inf ? error("Particle inside infinite potential") : nothing
                         y_wall += 2σ_w;
                     end
-                    y_wall = - L / 2 - 2σ_w;
+                    y_wall = - L / 2 - 2σ_w*N_Slates;
                     x_wall += 2σ_w;
                 end
             else 
-                x_wall = -L / 2 - 3σ_w
-                y_wall = -L / 2 - 3σ_w
+                x_wall = -L / 2 - 3σ_w*N_Slates;
+                y_wall = -L / 2 - 3σ_w*N_Slates;
                 z_wall = h / 2 + j*σ_w;
                 for i_x = 1:N
                     for i_y = 1:N
@@ -653,13 +651,11 @@ function Potential(N_Bins::Int64, L::Float64, h::Float64, σ_w::Float64, λ_w::F
                         Delta_y = y_wall - y[i];
                         Delta_z = z_wall - abs(z[i]);
                         r2 = Delta_x^2 + Delta_y^2 + Delta_z^2;
-                        if r2 <= λ_w^2
-                            Energy += u_SquareWell(r2, σ_w, λ_w)
-                        end
-                        #Energy == Inf ? error("Particle inside infinite potential") : nothing
+                        Energy += u_SquareWell(r2, σ_w, λ_w)
+                        Energy == Inf ? error("Particle inside infinite potential") : nothing
                         y_wall += 2σ_w;
                     end
-                    y_wall = - L / 2 - 3σ_w;
+                    y_wall = - L / 2 - 3σ_w*N_Slates;
                     x_wall += 2σ_w;
                 end
             end
@@ -685,7 +681,7 @@ function Povray_Pov(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::
     println(Pov_File, "global_settings {\n\tambient_light rgb <0.2, 0.2, 0.2>\tmax_trace_level 15\n}\n")
     println(Pov_File, "background { color rgb <1, 1, 1> }\n")
     println(Pov_File, "#default { finish {ambient .8 diffuse 1 specular 1 roughness .005 metallic 0.7 phong 1} }\n")
-    h > L ? println(Pov_File, "camera {\n\tperspective\n\tlocation <0, $(-1.55h), 0>\n\tlook_at <0, 0, 0>\n}\n") : println(Pov_File, "camera {\n\tperspective\n\tlocation <0, $(-1.55L), 0>\n\tlook_at <0, 0, 0>\n}\n")
+    h > L ? println(Pov_File, "camera {\n\tperspective\n\tlocation <0, $(-1.55h), 0>\n\tlook_at <0, 0, 0>\n}\n") : println(Pov_File, "camera {\n\tperspective\n\tlocation <0, $(-2L), 0>\n\tlook_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<0, $(-5L), 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<0, $(+5L), 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<$(-5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
@@ -722,4 +718,4 @@ function Povray_ini(ChemPot::Float64, T::Float64, Frames::Int64)
     close(Ini_File)
 end
 
-@time Mezei(-3., 5., 25., 2.)
+@time Mezei(-3., 10., 25., 2.)

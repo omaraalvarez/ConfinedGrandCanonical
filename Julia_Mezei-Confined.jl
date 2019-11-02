@@ -4,10 +4,10 @@ using Test;
 
 function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
     """     CONFIGURATIONAL STEPS       """
-    MC_Relaxation_Steps = 250_000;
-    MC_Equilibrium_Steps = 5_000_000;
+    MC_Relaxation_Steps = 50_000;
+    MC_Equilibrium_Steps = 500_000;
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps;
-    MC_Measurement = 5000;
+    MC_Measurement = 1000;
     """     VARIABLE INITIALIZATION     """
     Overlap = 1.0;
     x, y, z = Float64[], Float64[], Float64[];
@@ -24,13 +24,14 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     Energy_Sum, Density_Sum = 0., 0.;
     Energy_Array, Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
     Average_Energy_Array, Average_Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
-    N_Bins = 100;
+    σ_Energy, σ_Density = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ); 
+    N_Bins = 2;
+    Density_Array_z = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ), N_Bins )
     g_x, g_y, g_z = zeros(Float64, N_Bins), zeros(Float64, N_Bins), zeros(Float64, N_Bins);
     PotentialFunction = zeros(Float64, N_Bins);
     Delta = h / N_Bins;
-
     """     OUTPUT FILES        """
-    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_T_$(round(T, digits = 2))"
+    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_h_$(h)_T_$(round(T, digits = 2))"
     mkpath("$Output_Route/Positions")
     Average_Energy_File = open("$Output_Route/Average_Energy.dat", "w");
     println(Average_Energy_File, "#\t< E / N >")
@@ -42,38 +43,47 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     println(Density_File, "#\tDensity")
     """          SLATES CREATION    """
     σ_p, λ_p = 0.5, 1.5;
+    λ_p > L ? error("Particle's interaction range overextends simulation's box length.") : nothing
     σ_w, λ_w = 0.5, 1.5;
+    λ_w > h / 2. ? error("Pore's wall potential range exceeds half the length of the box.") : nothing
     N_Slates = convert(Int64, ceil((λ_w - σ_w) / σ_w));
-    #N = convert(Int64, floor(L / (2σ_w))) + 3;
     N = convert(Int64, floor(L / (2σ_w))) + 2N_Slates + 1;
     File_Slates_Avogadro = open("$Output_Route/Slate_Avogadro.xyz", "w")
     File_Slates = open("$Output_Route/Positions/Slate.xyz", "w")
-    println(File_Slates_Avogadro, "$(N_Slates * N^2)\n")
+    N_Avogadro = 0;
     for i = 1:N_Slates
         if isodd(i)
-            rx = -L / 2 - 2σ_w*N_Slates;
-            ry = -L / 2 - 2σ_w*N_Slates;
+            N_Avogadro += N^2;
+        else
+            N_Avogadro += (N + 1)^2;
+        end
+    end
+    println(File_Slates_Avogadro, "$N_Avogadro\n")
+    for i = 1:N_Slates
+        if isodd(i)
+            rx = -L / 2 - 2N_Slates * σ_w;
+            ry = -L / 2 - 2N_Slates * σ_w;
             rz = h / 2 + i*σ_w;
             for i_x = 1:N
                 for i_y = 1:N
                     println(File_Slates_Avogadro, "H\t$rx\t$ry\t$rz")
-                    i_x == N && i_y == N ? println(File_Slates, "$rx,\t$ry,\t$rz") : println(File_Slates, "$rx,\t$ry,\t$rz,")
+                    i == N_Slates && i_x == N && i_y == N ? println(File_Slates, "$rx,\t$ry,\t$rz") : println(File_Slates, "$rx,\t$ry,\t$rz,")
                     ry += 2σ_w;
                 end
-                ry = - L / 2 - 2σ_w*N_Slates;
+                ry = -L / 2 - 2N_Slates * σ_w;
                 rx += 2σ_w;
             end
         else 
-            rx = -L / 2 - 3σ_w*N_Slates;
-            ry = -L / 2 - 3σ_w*N_Slates;
+            rx = -L / 2 - (2N_Slates + 1)*σ_w;
+            ry = -L / 2 - (2N_Slates + 1)*σ_w;
             rz = h / 2 + i*σ_w;
-            for i_x = 1:N
-                for i_y = 1:N
+            for i_x = 1:N + 1
+                for i_y = 1:N + 1
                     println(File_Slates_Avogadro, "H\t$rx\t$ry\t$rz")
-                    i_x == N && i_y == N ? println(File_Slates, "$rx,\t$ry,\t$rz") : println(File_Slates, "$rx,\t$ry,\t$rz,")
+                    i == N_Slates && i_x == N + 1 && i_y == N + 1 ? println(File_Slates, "$rx,\t$ry,\t$rz") : println(File_Slates, "$rx,\t$ry,\t$rz,")
                     ry += 2σ_w;
                 end
-                ry = - L / 2 - 3σ_w*N_Slates;
+                ry = -L / 2 - (2N_Slates + 1)*σ_w;
                 rx += 2σ_w;
             end
         end
@@ -174,6 +184,10 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
                 Density_Sum += length(x) / V;
                 Average_Density_Array[N_Measurements] = Density_Sum / N_Measurements;
                 println(Average_Density_File, "$N_Measurements\t$(round(Average_Density_Array[N_Measurements], digits = 6))")
+                if N_Measurements > 1
+                    σ_Energy[N_Measurements] = std(Energy_Array[1:N_Measurements]);
+                    σ_Density[N_Measurements] = std(Density_Array[1:N_Measurements]);
+                end
                 g_x += Distribution(N_Bins, L, x)
                 g_y += Distribution(N_Bins, L, y)
                 g_z += Distribution(N_Bins, h, z)
@@ -235,7 +249,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
         println(g_z_File, "$(r[i])\t$(round(g_z[i], digits = 6))")
     end
     close(g_z_File)
-    Distribution_z_Plot = plot(r, g_z, legend = false, xlabel = "z", ylabel = "Density", width = 3, size = [1200, 800])
+    Distribution_z_Plot = plot(r, g_z, legend = false, xlabel = "z", ylabel = "Density", width = 3, size = [1200, 800], ylims = (0, maximum(g_y)))
     savefig(Distribution_z_Plot, "$Output_Route/Density_z")
 
     PotentialFunction /= N_Measurements;
@@ -276,7 +290,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     Energy_Histogram = histogram(Energy_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end], bins = 20, legend = false, xlabel = "Energy [Unitless]", ylabel = "Frequency", size = [1200, 800])
     vline!([mean(Energy_Array)], color = :black, width = 2, linestyle = :dash)
     savefig(Energy_Histogram, "$Output_Route/Energy_Histogram")
-    Average_Energy_Plot = plot(Average_Energy_Array, legend = false, xlabel = "Measurements", ylabel = "< Energy > [Unitless]", width = 3, size = [1200, 800])
+    Average_Energy_Plot = plot(Average_Energy_Array, ribbon = σ_Energy, fillalpha = 0.2, legend = false, xlabel = "Measurements", ylabel = "< Energy > [Unitless]", width = 3, size = [1200, 800])
     hline!([mean(Energy_Array)], color = :black, width = 2, linestyle = :dash)
     savefig(Average_Energy_Plot, "$Output_Route/Average_Energy")
 
@@ -288,7 +302,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     Density_Histogram = histogram(Density_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end], bins = 20, legend = false, xlabel = "Density [Unitless]", ylabel = "Frequency", size = [1200, 800])
     vline!([mean(Density_Array)], color = :black, width = 2, linestyle = :dash)
     savefig(Density_Histogram, "$Output_Route/Density_Histogram")
-    Average_Density_Plot = plot(Average_Density_Array, legend = false, xlabel = "Measurements", ylabel= "< Density > [Unitless]", width = 3, size = [1200, 800])
+    Average_Density_Plot = plot(Average_Density_Array, ribbon = σ_Density, fillalpha = 0.2, legend = false, xlabel = "Measurements", ylabel= "< Density > [Unitless]", width = 3, size = [1200, 800])
     hline!([mean(Density_Array)], color = :black, width = 2, linestyle = :dash)
     savefig(Average_Density_Plot, "$Output_Route/Average_Density")
 
@@ -298,7 +312,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     println(Summary_File, "< Density > = $(round(mean(Density_Array), digits = 6)) ± $(round(std(Density_Array), digits = 6))")
     close(Summary_File)
 
-    Povray_ini(ChemPot, T, convert(Int64, N_Measurements / 100))
+    Povray_ini(h, ChemPot, T, convert(Int64, floor(N_Measurements / 100)))
     Povray_Pov(h, L, ChemPot, T, σ_w, λ_w)
     run(`povray $Output_Route/Positions/MC_Animation.ini`)
 end
@@ -405,8 +419,8 @@ function Energy_Calculation(h::Float64, L::Float64, R_Cut::Float64, σ_p::Float6
     N = convert(Int64, floor(L / (2σ_w))) + 3;
     for i = 1:N_Slates
         if isodd(i)
-            x_wall = -L / 2 - 2σ_w*N_Slates;
-            y_wall = -L / 2 - 2σ_w*N_Slates;
+            x_wall = -L / 2 - 2N_Slates * σ_w;
+            y_wall = -L / 2 - 2N_Slates * σ_w;
             z_wall = h / 2 + i*σ_w;
             for i_x = 1:N
                 for i_y = 1:N
@@ -422,8 +436,8 @@ function Energy_Calculation(h::Float64, L::Float64, R_Cut::Float64, σ_p::Float6
                 x_wall += 2σ_w;
             end
         else 
-            x_wall = -L / 2 - 3σ_w*N_Slates;
-            y_wall = -L / 2 - 3σ_w*N_Slates;
+            x_wall = -L / 2 - -L / 2 - (2N_Slates + 1)*σ_w;
+            y_wall = -L / 2 - -L / 2 - (2N_Slates + 1)*σ_w;
             z_wall = h / 2 + i*σ_w;
             for i_x = 1:N
                 for i_y = 1:N
@@ -435,7 +449,7 @@ function Energy_Calculation(h::Float64, L::Float64, R_Cut::Float64, σ_p::Float6
                     Energy == Inf ? (return Energy) : nothing
                     y_wall += 2σ_w;
                 end
-                y_wall = - L / 2 - 3σ_w*N_Slates;
+                y_wall = - L / 2 - (2N_Slates + 1)*σ_w;
                 x_wall += 2σ_w;
             end
         end
@@ -625,8 +639,8 @@ function Potential(N_Bins::Int64, L::Float64, h::Float64, σ_w::Float64, λ_w::F
         Energy = 0;
         for j = 1:N_Slates
             if isodd(j)
-                x_wall = -L / 2 - 2σ_w*N_Slates;
-                y_wall = -L / 2 - 2σ_w*N_Slates;
+                x_wall = -L / 2 - 2N_Slates * σ_w;
+                y_wall = -L / 2 - 2N_Slates * σ_w;
                 z_wall = h / 2 + j*σ_w;
                 for i_x = 1:N
                     for i_y = 1:N
@@ -642,8 +656,8 @@ function Potential(N_Bins::Int64, L::Float64, h::Float64, σ_w::Float64, λ_w::F
                     x_wall += 2σ_w;
                 end
             else 
-                x_wall = -L / 2 - 3σ_w*N_Slates;
-                y_wall = -L / 2 - 3σ_w*N_Slates;
+                x_wall = -L / 2 - (2N_Slates + 1)*σ_w;
+                y_wall = -L / 2 - (2N_Slates + 1)*σ_w;
                 z_wall = h / 2 + j*σ_w;
                 for i_x = 1:N
                     for i_y = 1:N
@@ -655,7 +669,7 @@ function Potential(N_Bins::Int64, L::Float64, h::Float64, σ_w::Float64, λ_w::F
                         Energy == Inf ? error("Particle inside infinite potential") : nothing
                         y_wall += 2σ_w;
                     end
-                    y_wall = - L / 2 - 3σ_w*N_Slates;
+                    y_wall = - L / 2 - (2N_Slates + 1)*σ_w;
                     x_wall += 2σ_w;
                 end
             end
@@ -676,7 +690,7 @@ function Distribution(N_Bins::Int64, L::Float64, x::Array{Float64, 1})
 end
 
 function Povray_Pov(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::Float64, λ_w::Float64)
-    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_T_$(round(T, digits = 2))/Positions"
+    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_h_$(h)_T_$(round(T, digits = 2))/Positions"
     Pov_File = open("$Output_Route/MC_Animation.pov", "w");
     println(Pov_File, "global_settings {\n\tambient_light rgb <0.2, 0.2, 0.2>\tmax_trace_level 15\n}\n")
     println(Pov_File, "background { color rgb <1, 1, 1> }\n")
@@ -703,8 +717,8 @@ function Povray_Pov(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::
     close(Pov_File)
 end
 
-function Povray_ini(ChemPot::Float64, T::Float64, Frames::Int64)
-    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_T_$(round(T, digits = 2))/Positions"
+function Povray_ini(h::Float64, ChemPot::Float64, T::Float64, Frames::Int64)
+    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_h_$(h)_T_$(round(T, digits = 2))/Positions"
     mkpath("$Output_Route")
     Ini_File = open("$Output_Route/MC_Animation.ini", "w");
     println(Ini_File, "Input_File_Name = $Output_Route/MC_Animation.pov")
@@ -718,4 +732,4 @@ function Povray_ini(ChemPot::Float64, T::Float64, Frames::Int64)
     close(Ini_File)
 end
 
-@time Mezei(-3., 10., 25., 2.)
+@time Mezei(-3., 10., 10., 2.)

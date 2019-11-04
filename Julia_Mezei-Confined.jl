@@ -4,19 +4,20 @@ using Test;
 
 function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
     """     CONFIGURATIONAL STEPS       """
-    MC_Relaxation_Steps = 50_000;
-    MC_Equilibrium_Steps = 500_000;
+    MC_Relaxation_Steps = 250_000;
+    MC_Equilibrium_Steps = 2_500_000;
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps;
-    MC_Measurement = 1000;
+    MC_Measurement = 1_000;
+    σ_p, λ_p = 0.5, 1.5;
+    σ_w, λ_w = 0.5, 2.5;
     """     VARIABLE INITIALIZATION     """
-    Overlap = 1.0;
     x, y, z = Float64[], Float64[], Float64[];
     V = h * L^2;
     Beta = 1. / T
     Pc, Pc_Sum, Pc_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
-    Pc_Grid, Pc_Grid_Sum, Pc_Grid_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
-    Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
-    Displacement, N_Displacement, N_Displacement_Accepted = L / 8., 0, 0;
+    #Pc_Grid, Pc_Grid_Sum, Pc_Grid_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
+    #Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
+    z_Displacement, Displacement, N_Displacement, N_Displacement_Accepted = h / 8., L / 8., 0, 0;
     N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0;
     N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0;
     N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0;
@@ -25,13 +26,12 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     Energy_Array, Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
     Average_Energy_Array, Average_Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
     σ_Energy, σ_Density = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ); 
-    N_Bins = 2;
-    Density_Array_z = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ), N_Bins )
-    g_x, g_y, g_z = zeros(Float64, N_Bins), zeros(Float64, N_Bins), zeros(Float64, N_Bins);
+    N_Bins = 50;
+    g_x, g_y, g_z = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ), N_Bins), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ), N_Bins), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ), N_Bins);
     PotentialFunction = zeros(Float64, N_Bins);
     Delta = h / N_Bins;
     """     OUTPUT FILES        """
-    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_h_$(h)_T_$(round(T, digits = 2))"
+    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_h_$(h)_T_$(round(T, digits = 2))_lambdaw_$(λ_w)"
     mkpath("$Output_Route/Positions")
     Average_Energy_File = open("$Output_Route/Average_Energy.dat", "w");
     println(Average_Energy_File, "#\t< E / N >")
@@ -42,10 +42,8 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     Density_File = open("$Output_Route/Density.dat", "w");
     println(Density_File, "#\tDensity")
     """          SLATES CREATION    """
-    σ_p, λ_p = 0.5, 1.5;
-    λ_p > L ? error("Particle's interaction range overextends simulation's box length.") : nothing
-    σ_w, λ_w = 0.5, 1.5;
-    λ_w > h / 2. ? error("Pore's wall potential range exceeds half the length of the box.") : nothing
+    λ_p > L ? error("L = $L, λ_p = $λ_p. Resize simulation box length.") : nothing
+    λ_w > h / 2. ? error("L = $L, λ_p = $λ_p. Resize simulation box height.") : nothing
     N_Slates = convert(Int64, ceil((λ_w - σ_w) / σ_w));
     N = convert(Int64, floor(L / (2σ_w))) + 2N_Slates + 1;
     File_Slates_Avogadro = open("$Output_Route/Slate_Avogadro.xyz", "w")
@@ -98,6 +96,8 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
             println("U / N = $(round(Energy / length(x), digits = 6))")
             println("N = $(length(x))")
             println("Density = $(round(length(x) / V, digits = 6))")
+            println("Displacement = $(round(Displacement, digits = 6))")
+            println("Z Displacement = $(round(z_Displacement, digits = 6))")
             println("Movements: $N_Movement")
             println("   Accepted: $N_Movement_Accepted")
             println("   Rejected: $N_Movement_Rejected")
@@ -118,6 +118,8 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
             println("U / N = $(round(Energy / length(x), digits = 6))")
             println("N = $(length(x))")
             println("Density = $(round(length(x) / V, digits = 6))")
+            println("Displacement = $Displacement")
+            println("Z Displacement = $(round(z_Displacement, digits = 6))")
             println("Movements: $N_Movement")
             println("   Accepted: $N_Movement_Accepted")
             println("   Rejected: $N_Movement_Rejected")
@@ -138,13 +140,13 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
         if RN == 1 && length(x) > 1
             N_Movement += 1;
             N_Displacement += 1;
-            Energy, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted = Movement(h, L, Beta, Displacement, σ_p, λ_p, σ_w, λ_w, N_Slates, Energy, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted, R_Cut, x, y, z)
+            Energy, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted = Movement(h, L, Beta, z_Displacement, Displacement, σ_p, λ_p, σ_w, λ_w, N_Slates, Energy, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted, R_Cut, x, y, z)
         end
         if RN == 2
             N_Insertion += 1;
-            Pc_Grid, Pc_Grid_Sum, Pc_Grid_N = Grid_Excluded_Volume(Overlap, h, L, Pc_Grid, Pc_Grid_Sum, Pc_Grid_N, x, y, z)
-            Pc, Pc_Sum, Pc_N, x_Insertion, y_Insertion, z_Insertion = Random_Excluded_Volume(Overlap, h, L, Pc, Pc_Sum, Pc_N, x, y, z)
-            Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N = Analytic_Excluded_Volume(Overlap, L, V, Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N, x, y, z)
+            #Pc_Grid, Pc_Grid_Sum, Pc_Grid_N = Grid_Excluded_Volume(2σ_p, h, L, Pc_Grid, Pc_Grid_Sum, Pc_Grid_N, x, y, z)
+            Pc, Pc_Sum, Pc_N, x_Insertion, y_Insertion, z_Insertion = Random_Excluded_Volume(2σ_p, h, L, σ_w, Pc, Pc_Sum, Pc_N, x, y, z)
+            #Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N = Analytic_Excluded_Volume(2σ_p, L, V, Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N, x, y, z)
             if length(x_Insertion) > 0
                 Energy, N_Insertion_Accepted, N_Insertion_Rejected = Insertion_Mezei(h, Beta, ChemPot, L, V, R_Cut, σ_p, λ_p, σ_w, λ_w, N_Slates, Energy, N_Insertion_Accepted, N_Insertion_Rejected, x, y, z, x_Insertion, y_Insertion, z_Insertion, Pc)
             else
@@ -188,21 +190,29 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
                     σ_Energy[N_Measurements] = std(Energy_Array[1:N_Measurements]);
                     σ_Density[N_Measurements] = std(Density_Array[1:N_Measurements]);
                 end
-                g_x += Distribution(N_Bins, L, x)
-                g_y += Distribution(N_Bins, L, y)
-                g_z += Distribution(N_Bins, h, z)
+                g_x[N_Measurements, :] = Distribution(N_Bins, L, x);
+                g_y[N_Measurements, :] = Distribution(N_Bins, L, y);
+                g_z[N_Measurements, :] = Distribution(N_Bins, h, z);
                 PotentialFunction += Potential(N_Bins, L, h, σ_w, λ_w, N_Slates, x, y, z)
-                if N_Measurements % 100 == 0
-                    Positions_File = open("$Output_Route/Positions/Pos_$(convert(Int64, N_Measurements / 100)).xyz", "w");
+                if N_Measurements % 25 == 0
+                    Positions_File = open("$Output_Route/Positions/Pos_$(convert(Int64, N_Measurements / 25)).xyz", "w");
                     for i = 1:length(x)
                         i != length(x) ? println(Positions_File, "$(x[i]),\t$(y[i]),\t$(z[i]),") : println(Positions_File, "$(x[i]),\t$(y[i]),\t$(z[i])")
                     end
                 end
             end
             if i % 10MC_Measurement == 0
-                N_Displacement_Accepted / N_Displacement > 0.55 ? Displacement *= 1.05 : Displacement *= 0.95
+                if N_Displacement_Accepted / N_Displacement > 0.55
+                    Displacement *= 1.05
+                    z_Displacement *= 1.05
+                else
+                    Displacement *= 0.95
+                    z_Displacement *= 0.95
+                end
                 Displacement < 0.05 ? Displacement = 0.05 : nothing
                 Displacement > L / 4. ? Displacement = L / 4. : nothing
+                z_Displacement < 0.05 ? z_Displacement = 0.05 : nothing
+                z_Displacement > h / 4. ? z_Displacement = h / 4. : nothing
                 N_Displacement, N_Displacement_Accepted = 0, 0;
             end
         end
@@ -210,46 +220,52 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     close(Average_Energy_File)
     close(Average_Density_File)
     
-    g_x /= N_Measurements * V;
-    g_x *= N_Bins;
+    g_x *= (N_Bins / V);
+    g_x_Mean = mean(g_x, dims = 1)';
+    g_x_Std = std(g_x, dims = 1)';
+    g_x_Max = findmax(g_x_Mean)[1] + g_x_Std[findmax(g_x_Mean)[2][1]];
     Delta = L / N_Bins;
     r = zeros(Float64, N_Bins)
     g_x_File = open("$Output_Route/Distribution_x.dat", "w");
-    println(g_x_File, "#x\t#Density\n")
+    println(g_x_File, "#x\t#Density\tsigma\n")
     @inbounds for i = 1:N_Bins
         r[i] = round( - L / 2 + (i - 0.5) * Delta, digits = 6)
-        println(g_x_File, "$(r[i])\t$(round(g_x[i], digits = 6))")
+        println(g_x_File, "$(r[i])\t$(round(g_x_Mean[i], digits = 6))\t$(round(g_x_Std[i], digits = 6))")
     end
     close(g_x_File)
-    Distribution_x_Plot = plot(r, g_x, legend = false, xlabel = "x", ylabel = "Density", width = 3, size = [1200, 800], ylims = (0, maximum(g_x)))
+    Distribution_x_Plot = plot(r, g_x_Mean, ribbon = g_x_Std, fillalpha = 0.2, legend = false, xlabel = "x", ylabel = "Density", width = 3, size = [1200, 800], ylims = (0, g_x_Max))
     savefig(Distribution_x_Plot, "$Output_Route/Density_x")
 
-    g_y /= N_Measurements * V;
-    g_y *= N_Bins;
+    g_y *= (N_Bins / V);
+    g_y_Mean = mean(g_y, dims = 1)';
+    g_y_Std = std(g_y, dims = 1)';
+    g_y_Max = findmax(g_y_Mean)[1] + g_y_Std[findmax(g_y_Mean)[2][1]];
     Delta = L / N_Bins;
     r = zeros(Float64, N_Bins)
     g_y_File = open("$Output_Route/Distribution_y.dat", "w");
-    println(g_y_File, "#y\t#Density\n")
+    println(g_y_File, "#y\t#Density\tsigma\n")
     @inbounds for i = 1:N_Bins
         r[i] = round( - L / 2 + (i - 0.5) * Delta, digits = 6)
-        println(g_y_File, "$(r[i])\t$(round(g_y[i], digits = 6))")
+        println(g_y_File, "$(r[i])\t$(round(g_y_Mean[i], digits = 6))")
     end
     close(g_y_File)
-    Distribution_y_Plot = plot(r, g_y, legend = false, xlabel = "y", ylabel = "Density", width = 3, size = [1200, 800], ylims = (0, maximum(g_y)))
+    Distribution_y_Plot = plot(r, g_y_Mean, ribbon = g_y_Std, fillalpha = 0.2, legend = false, xlabel = "y", ylabel = "Density", width = 3, size = [1200, 800], ylims = (0, g_y_Max))
     savefig(Distribution_y_Plot, "$Output_Route/Density_y")
 
-    g_z /= N_Measurements * V;
-    g_z *= N_Bins;
+    g_z *= (N_Bins / V);
+    g_z_Mean = mean(g_z, dims = 1)';
+    g_z_Std = std(g_z, dims = 1)';
+    g_z_Max = findmax(g_z_Mean)[1] + g_z_Std[findmax(g_z_Mean)[2][1]];
     Delta = h / N_Bins;
     r = zeros(Float64, N_Bins)
     g_z_File = open("$Output_Route/Distribution_z.dat", "w");
-    println(g_z_File, "#z\t#Density\n")
+    println(g_z_File, "#z\t#Density\tsigma\n")
     @inbounds for i = 1:N_Bins
         r[i] = round( - h / 2 + (i - 0.5) * Delta, digits = 6)
-        println(g_z_File, "$(r[i])\t$(round(g_z[i], digits = 6))")
+        println(g_z_File, "$(r[i])\t$(round(g_z_Mean[i], digits = 6))")
     end
     close(g_z_File)
-    Distribution_z_Plot = plot(r, g_z, legend = false, xlabel = "z", ylabel = "Density", width = 3, size = [1200, 800], ylims = (0, maximum(g_y)))
+    Distribution_z_Plot = plot(r, g_z_Mean, ribbon = g_z_Std, fillalpha = 0.2, legend = false, xlabel = "z", ylabel = "Density", width = 3, size = [1200, 800], ylims = (0, g_z_Max))
     savefig(Distribution_z_Plot, "$Output_Route/Density_z")
 
     PotentialFunction /= N_Measurements;
@@ -265,22 +281,23 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     Pc_File = open("$Output_Route/Pc.dat", "w");
     println(Pc_File, "#N\t#Pc_Random\t#Pc_Grid\t#Pc_Analytic")
     Pc_Array = zeros(Float64, length(Pc) - 1)
-    Pc_Grid_Array = zeros(Float64, length(Pc) - 1)
-    Pc_Analytic_Array = zeros(Float64, length(Pc) - 1)
+    #Pc_Grid_Array = zeros(Float64, length(Pc) - 1)
+    #Pc_Analytic_Array = zeros(Float64, length(Pc) - 1)
     @inbounds for i in keys(Pc)
         if i != 0
             Pc_Array[i] = Pc[i];
-            Pc_Grid_Array[i] = Pc_Grid[i];
-            Pc_Analytic_Array[i] = Pc_Analytic[i];
+            #Pc_Grid_Array[i] = Pc_Grid[i];
+            #Pc_Analytic_Array[i] = Pc_Analytic[i];
         end
     end
     for i = 1:length(Pc_Array)
-        println(Pc_File, "$i\t$(round(Pc_Array[i], digits = 6))\t$(round(Pc_Grid_Array[i], digits = 6))\t$(round(Pc_Analytic_Array[i], digits = 6))")
+        println(Pc_File, "$i\t$(round(Pc_Array[i], digits = 6))")
+        #println(Pc_File, "$i\t$(round(Pc_Array[i], digits = 6))\t$(round(Pc_Grid_Array[i], digits = 6))\t$(round(Pc_Analytic_Array[i], digits = 6))")
     end
     close(Pc_File)
     Pc_Plot = plot(Pc_Array, label = "Random", xlabel = "N", ylabel = "Cavity Probability", ylims = (0, 1), width = 3, size = [1200, 800])
-    plot!(Pc_Grid_Array, label = "Grid", width = 3)
-    plot!(Pc_Analytic_Array, label = "Analytic", width = 3)
+    #plot!(Pc_Grid_Array, label = "Grid", width = 3)
+    #plot!(Pc_Analytic_Array, label = "Analytic", width = 3)
     savefig(Pc_Plot, "$Output_Route/Pc")
 
     println("< E / N > = $(round(mean(Energy_Array), digits = 6)) ± $(round(std(Energy_Array), digits = 6))")
@@ -312,12 +329,12 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     println(Summary_File, "< Density > = $(round(mean(Density_Array), digits = 6)) ± $(round(std(Density_Array), digits = 6))")
     close(Summary_File)
 
-    Povray_ini(h, ChemPot, T, convert(Int64, floor(N_Measurements / 100)))
+    Povray_ini(h, ChemPot, T, λ_w, convert(Int64, floor(N_Measurements / 25)))
     Povray_Pov(h, L, ChemPot, T, σ_w, λ_w)
     run(`povray $Output_Route/Positions/MC_Animation.ini`)
 end
 
-function Movement(h::Float64, L::Float64, Beta::Float64, Displacement::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, N_Slates::Int64, Energy::Float64, N_Movement_Accepted::Int64, N_Movement_Rejected::Int64, N_Displacement_Accepted::Int64, R_Cut::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
+function Movement(h::Float64, L::Float64, Beta::Float64, z_Displacement::Float64, Displacement::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, N_Slates::Int64, Energy::Float64, N_Movement_Accepted::Int64, N_Movement_Rejected::Int64, N_Displacement_Accepted::Int64, R_Cut::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
     j = rand(1:length(x))
     Energy_Old = Energy_Calculation(h, L, R_Cut, σ_p, λ_p, σ_w, λ_w, N_Slates, x[j], y[j], z[j], x, y, z)
     x_Old, y_Old, z_Old = x[j], y[j], z[j];
@@ -416,7 +433,7 @@ end
 
 function Energy_Calculation(h::Float64, L::Float64, R_Cut::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, N_Slates::Int64, rx::Float64, ry::Float64, rz::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
     Energy = 0;
-    N = convert(Int64, floor(L / (2σ_w))) + 3;
+    N = convert(Int64, floor(L / (2σ_w))) + 2N_Slates + 1;
     for i = 1:N_Slates
         if isodd(i)
             x_wall = -L / 2 - 2N_Slates * σ_w;
@@ -479,40 +496,44 @@ function PeriodicBoundaryConditions(L::Float64, x::Float64)
     return x
 end
 
-function Random_Excluded_Volume(Overlap::Float64, h::Float64, L::Float64, Pc::Dict{Int64, Float64}, Pc_Sum::Dict{Int64, Float64}, Pc_N::Dict{Int64, Int64}, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
+function Random_Excluded_Volume(Overlap::Float64, h::Float64, L::Float64, σ_w::Float64, Pc::Dict{Int64, Float64}, Pc_Sum::Dict{Int64, Float64}, Pc_N::Dict{Int64, Int64}, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
     N_Random = 1000;
     N_in = 0;
     x_Insertion, y_Insertion, z_Insertion = Float64[], Float64[], Float64[];
     if length(x) == 1
         for i = 1:N_Random
-            x_V = L * (rand() - 0.5);
-            y_V = L * (rand() - 0.5);
             z_V = h * (rand() - 0.5);
-            N_in += 1;
-            append!(x_Insertion, x_V)
-            append!(y_Insertion, y_V)
-            append!(z_Insertion, z_V)
+            if z_V < h / 2 - σ_w || z_V > -h / 2 + σ_w
+                x_V = L * (rand() - 0.5);
+                y_V = L * (rand() - 0.5);
+                N_in += 1;
+                append!(x_Insertion, x_V)
+                append!(y_Insertion, y_V)
+                append!(z_Insertion, z_V)
+            end
         end
     else
         @inbounds for i = 1:N_Random
-            x_V = L * (rand() - 0.5);
-            y_V = L * (rand() - 0.5);
             z_V = h * (rand() - 0.5);
-            for j = 1:length(x)
-                Delta_x = x_V - x[j];
-                Delta_x = PeriodicBoundaryConditions(L, Delta_x);
-                Delta_y = y_V - y[j];
-                Delta_y = PeriodicBoundaryConditions(L, Delta_y);
-                Delta_z = z_V - z[j];
-                r2 = Delta_x^2 + Delta_y^2 + Delta_z^2;
-                if r2 < Overlap^2
-                    break
-                end
-                if j == length(x)
-                    N_in += 1;
-                    append!(x_Insertion, x_V)
-                    append!(y_Insertion, y_V)
-                    append!(z_Insertion, z_V)
+            if z_V < h / 2 - σ_w || z_V > -h / 2 + σ_w
+                x_V = L * (rand() - 0.5);
+                y_V = L * (rand() - 0.5);
+                for j = 1:length(x)
+                    Delta_x = x_V - x[j];
+                    Delta_x = PeriodicBoundaryConditions(L, Delta_x);
+                    Delta_y = y_V - y[j];
+                    Delta_y = PeriodicBoundaryConditions(L, Delta_y);
+                    Delta_z = z_V - z[j];
+                    r2 = Delta_x^2 + Delta_y^2 + Delta_z^2;
+                    if r2 < Overlap^2
+                        break
+                    end
+                    if j == length(x)
+                        N_in += 1;
+                        append!(x_Insertion, x_V)
+                        append!(y_Insertion, y_V)
+                        append!(z_Insertion, z_V)
+                    end
                 end
             end
         end
@@ -690,7 +711,7 @@ function Distribution(N_Bins::Int64, L::Float64, x::Array{Float64, 1})
 end
 
 function Povray_Pov(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::Float64, λ_w::Float64)
-    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_h_$(h)_T_$(round(T, digits = 2))/Positions"
+    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_h_$(h)_T_$(round(T, digits = 2))_lambdaw_$(λ_w)/Positions"
     Pov_File = open("$Output_Route/MC_Animation.pov", "w");
     println(Pov_File, "global_settings {\n\tambient_light rgb <0.2, 0.2, 0.2>\tmax_trace_level 15\n}\n")
     println(Pov_File, "background { color rgb <1, 1, 1> }\n")
@@ -700,7 +721,7 @@ function Povray_Pov(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::
     println(Pov_File, "light_source {\n\t<0, $(+5L), 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<$(-5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<$(+5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
-    println(Pov_File, "#macro Particle(rx, ry, rz)\n\tintersection {\n\t\t\tsphere {\n\t\t\t<rx, ry, rz>, 0.5\n\t\t\t #if (rz > $(h / 2 - (λ_w - σ_w)) | rz < $(-h / 2 + (λ_w - σ_w))) pigment {rgbt <0, 0, 1, 0> } #else pigment {rgbt <107/255, 173/255, 197/255, 0> } #end\n\t\t}\n\t\tbox {\n\t\t\t<-L/2, -L/2, h/2>,\t<L/2, L/2, -h/2>\n\t\t\tpigment {rgbt <107/255, 173/255, 197/255, 0> }\n\t\t}\n\tno_shadow}\n#end\n")
+    println(Pov_File, "#macro Particle(rx, ry, rz)\n\tintersection {\n\t\t\tsphere {\n\t\t\t<rx, ry, rz>, 0.5\n\t\t\t #if (rz > $(h / 2 - (λ_w - σ_w)) | rz < $(-h / 2 + (λ_w - σ_w))) pigment {rgbt <139/255, 80/255, 176/255, 0> } #else pigment {rgbt <107/255, 173/255, 197/255, 0> } #end\n\t\t}\n\t\tbox {\n\t\t\t<-L/2, -L/2, h/2>,\t<L/2, L/2, -h/2>\n\t\t\tpigment {rgbt <107/255, 173/255, 197/255, 0> }\n\t\t}\n\tno_shadow}\n#end\n")
     println(Pov_File, "#macro Slate(rx, ry, rz, sigma_w, lambda_w)\n\tunion{\n\t\tsphere {\n\t\t\t<rx, ry, rz>, sigma_w\n\t\t\tpigment {rgbt <0.75, 0.75, 0.75, 0> }\n\t\tno_shadow}\n\t\tsphere {\n\t\t\t<rx, ry, -rz>, sigma_w\n\t\t\tpigment {rgbt <0.75, 0.75, 0.75, 0> }\n\t\tno_shadow}\n\t}\n#end")
     println(Pov_File, "#macro Walls(L, h)\n\tunion {\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, h / 2>, <-L / 2, L / 2, h / 2>, <L / 2, -L / 2, h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\tno_shadow}\n\t\ttriangle {\n\t\t\t<-L / 2, -L / 2, h / 2>, <-L / 2, L / 2, h / 2>, <L / 2, -L / 2, h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\tno_shadow}\n\t}\n
         union{\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h / 2>, <-L / 2, L / 2, -h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\t\ttriangle {\n\t\t\t<-L / 2, -L / 2, -h / 2>, <-L / 2, L / 2, -h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\tno_shadow}\n#end\n")
@@ -717,8 +738,8 @@ function Povray_Pov(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::
     close(Pov_File)
 end
 
-function Povray_ini(h::Float64, ChemPot::Float64, T::Float64, Frames::Int64)
-    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_h_$(h)_T_$(round(T, digits = 2))/Positions"
+function Povray_ini(h::Float64, ChemPot::Float64, T::Float64, λ_w::Float64, Frames::Int64)
+    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_h_$(h)_T_$(round(T, digits = 2))_lambdaw_$(λ_w)/Positions"
     mkpath("$Output_Route")
     Ini_File = open("$Output_Route/MC_Animation.ini", "w");
     println(Ini_File, "Input_File_Name = $Output_Route/MC_Animation.pov")
@@ -732,4 +753,4 @@ function Povray_ini(h::Float64, ChemPot::Float64, T::Float64, Frames::Int64)
     close(Ini_File)
 end
 
-@time Mezei(-3., 10., 10., 2.)
+@time Mezei(-3., 10., 20., 2.)

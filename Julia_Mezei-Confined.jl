@@ -2,18 +2,16 @@ using Statistics;
 using Plots;
 using Test;
 
-function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
+function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, R_Cut::Float64 = 3.)
     """     CONFIGURATIONAL STEPS       """
-    MC_Relaxation_Steps = 250_000;
-    MC_Equilibrium_Steps = 2_500_000;
+    MC_Relaxation_Steps = 2_000_000;
+    MC_Equilibrium_Steps = 10_000_000;
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps;
-    MC_Measurement = 1_000;
-    σ_p, λ_p = 0.5, 1.5;
-    σ_w, λ_w = 0.5, 2.5;
     """     VARIABLE INITIALIZATION     """
     x, y, z = Float64[], Float64[], Float64[];
     V = h * L^2;
-    Beta = 1. / T
+    MC_Measurement = convert(Int64, floor(V / ( (4. / 3.) * π * σ_p^3 )));
+    Beta = 1. / T;
     Pc, Pc_Sum, Pc_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
     #Pc_Grid, Pc_Grid_Sum, Pc_Grid_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
     #Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
@@ -26,12 +24,13 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     Energy_Array, Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
     Average_Energy_Array, Average_Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
     σ_Energy, σ_Density = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ); 
-    N_Bins = 50;
+    N_Bins = 200;
     g_x, g_y, g_z = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ), N_Bins), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ), N_Bins), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ), N_Bins);
     PotentialFunction = zeros(Float64, N_Bins);
     Delta = h / N_Bins;
+    ρ_Max = 1 / ( (4. / 3.) * π * σ_p^3 );
     """     OUTPUT FILES        """
-    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_h_$(h)_T_$(round(T, digits = 2))_lambdaw_$(λ_w)"
+    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_T_$(round(T, digits = 2))/h_$(h)_lambdaw_$(λ_w)"
     mkpath("$Output_Route/Positions")
     Average_Energy_File = open("$Output_Route/Average_Energy.dat", "w");
     println(Average_Energy_File, "#\t< E / N >")
@@ -42,8 +41,8 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     Density_File = open("$Output_Route/Density.dat", "w");
     println(Density_File, "#\tDensity")
     """          SLATES CREATION    """
-    λ_p > L ? error("L = $L, λ_p = $λ_p. Resize simulation box length.") : nothing
-    λ_w > h / 2. ? error("L = $L, λ_p = $λ_p. Resize simulation box height.") : nothing
+    #λ_p > L ? error("L = $L, λ_p = $λ_p. Resize simulation box length.") : nothing
+    #λ_w > h / 2. ? error("h = $h, λ_w = $λ_w. Resize simulation box height.") : nothing
     N_Slates = convert(Int64, ceil((λ_w - σ_w) / σ_w));
     N = convert(Int64, floor(L / (2σ_w))) + 2N_Slates + 1;
     File_Slates_Avogadro = open("$Output_Route/Slate_Avogadro.xyz", "w")
@@ -92,7 +91,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     @inbounds for i = 1:MC_Steps
         """     PRINTS PROGRESS TO SCREEN   """
         if i < MC_Relaxation_Steps && i % .01MC_Relaxation_Steps == 0
-            println("$(convert(Int64, 100i / MC_Relaxation_Steps))% Relaxation")
+            println("$(convert(Int64, floor(100i / MC_Relaxation_Steps)))% Relaxation")
             println("U / N = $(round(Energy / length(x), digits = 6))")
             println("N = $(length(x))")
             println("Density = $(round(length(x) / V, digits = 6))")
@@ -114,7 +113,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
         end
 
         if i > MC_Relaxation_Steps && i % .01MC_Equilibrium_Steps == 0
-            println("$(convert(Int64, 100(i - MC_Relaxation_Steps) / MC_Equilibrium_Steps))% Equilibrium ($N_Measurements Measurements).")
+            println("$(convert(Int64, floor(100(i - MC_Relaxation_Steps) / MC_Equilibrium_Steps)))% Equilibrium ($N_Measurements Measurements).")
             println("U / N = $(round(Energy / length(x), digits = 6))")
             println("N = $(length(x))")
             println("Density = $(round(length(x) / V, digits = 6))")
@@ -174,6 +173,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
             @test all(Array(x) .<= L / 2.) && all(Array(x) .>= -L / 2.)
             @test all(Array(y) .<= L / 2.) && all(Array(y) .>= -L / 2.)
             @test all(Array(z) .<= h / 2.) && all(Array(z) .>= -h / 2.)
+            @test length(x) / V < ρ_Max
             if i > MC_Relaxation_Steps
                 N_Measurements += 1;
                 Energy_Array[N_Measurements] = Energy / length(x);
@@ -300,38 +300,47 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, R_Cut::Floa
     #plot!(Pc_Analytic_Array, label = "Analytic", width = 3)
     savefig(Pc_Plot, "$Output_Route/Pc")
 
-    println("< E / N > = $(round(mean(Energy_Array), digits = 6)) ± $(round(std(Energy_Array), digits = 6))")
-    Energy_Plot = plot(Energy_Array, legend = false, xlabel = "Measurements", ylabel = "Energy [Unitless]", width = 1, size = [1200, 800])
-    hline!([mean(Energy_Array)], color = :black, width = 2, linestyle = :dash)
+    println("$MC_Relaxation_Steps Relaxation Steps.")
+    println("$MC_Equilibrium_Steps Equilibrium Steps")
+    println("Measurements Every $MC_Measurement Steps.\n")
+    println("< E / N > = $(round(mean(Energy_Array[1:end - 1]), digits = 6)) ± $(round(std(Energy_Array[1:end - 1]), digits = 6))")
+    Energy_Plot = plot(Energy_Array[1:end - 1], legend = false, xlabel = "Measurements", ylabel = "Energy [Unitless]", width = 1, size = [1200, 800])
+    hline!([mean(Energy_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Energy_Plot, "$Output_Route/Energy")
-    Energy_Histogram = histogram(Energy_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end], bins = 20, legend = false, xlabel = "Energy [Unitless]", ylabel = "Frequency", size = [1200, 800])
+    Energy_Histogram = histogram(Energy_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end - 1], bins = 20, legend = false, xlabel = "Energy [Unitless]", ylabel = "Frequency", size = [1200, 800])
     vline!([mean(Energy_Array)], color = :black, width = 2, linestyle = :dash)
     savefig(Energy_Histogram, "$Output_Route/Energy_Histogram")
-    Average_Energy_Plot = plot(Average_Energy_Array, ribbon = σ_Energy, fillalpha = 0.2, legend = false, xlabel = "Measurements", ylabel = "< Energy > [Unitless]", width = 3, size = [1200, 800])
-    hline!([mean(Energy_Array)], color = :black, width = 2, linestyle = :dash)
+    Average_Energy_Plot = plot(Average_Energy_Array[1:end - 1], ribbon = σ_Energy, fillalpha = 0.2, legend = false, xlabel = "Measurements", ylabel = "< Energy > [Unitless]", width = 3, size = [1200, 800])
+    hline!([mean(Energy_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Average_Energy_Plot, "$Output_Route/Average_Energy")
 
-    println("< N > = $(round(V*mean(Density_Array), digits = 6)) ± $(round(V*std(Density_Array), digits = 6))")
-    println("< Density > = $(round(mean(Density_Array), digits = 6)) ± $(round(std(Density_Array), digits = 6))")
-    Density_Plot = plot(Density_Array, legend = false, xlabel = "Measurements", ylabel = "Density [Unitless]", width = 1, size = [1200, 800])
-    hline!([mean(Density_Array)], color = :black, width = 2, linestyle = :dash)
+    println("< N > = $(round(V*mean(Density_Array[1:end - 1]), digits = 6)) ± $(round(V*std(Density_Array[1:end - 1]), digits = 6))")
+    println("< Density > = $(round(mean(Density_Array[1:end - 1]), digits = 6)) ± $(round(std(Density_Array[1:end - 1]), digits = 6))")
+    Density_Plot = plot(Density_Array[1:end - 1], legend = false, xlabel = "Measurements", ylabel = "Density [Unitless]", width = 1, size = [1200, 800])
+    hline!([mean(Density_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Density_Plot, "$Output_Route/Density")
-    Density_Histogram = histogram(Density_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end], bins = 20, legend = false, xlabel = "Density [Unitless]", ylabel = "Frequency", size = [1200, 800])
-    vline!([mean(Density_Array)], color = :black, width = 2, linestyle = :dash)
+    Density_Histogram = histogram(Density_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end - 1], bins = 20, legend = false, xlabel = "Density [Unitless]", ylabel = "Frequency", size = [1200, 800])
+    vline!([mean(Density_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Density_Histogram, "$Output_Route/Density_Histogram")
-    Average_Density_Plot = plot(Average_Density_Array, ribbon = σ_Density, fillalpha = 0.2, legend = false, xlabel = "Measurements", ylabel= "< Density > [Unitless]", width = 3, size = [1200, 800])
-    hline!([mean(Density_Array)], color = :black, width = 2, linestyle = :dash)
+    Average_Density_Plot = plot(Average_Density_Array[1:end - 1], ribbon = σ_Density, fillalpha = 0.2, legend = false, xlabel = "Measurements", ylabel= "< Density > [Unitless]", width = 3, size = [1200, 800])
+    hline!([mean(Density_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Average_Density_Plot, "$Output_Route/Average_Density")
 
     Summary_File = open("$Output_Route/Summary.dat", "w")
-    println(Summary_File, "< E / N > = $(round(mean(Energy_Array), digits = 6)) ± $(round(std(Energy_Array), digits = 6))")
-    println(Summary_File, "< N > = $(round(V*mean(Density_Array), digits = 6)) ± $(round(V*std(Density_Array), digits = 6))")
-    println(Summary_File, "< Density > = $(round(mean(Density_Array), digits = 6)) ± $(round(std(Density_Array), digits = 6))")
+    println(Summary_File, "$MC_Relaxation_Steps Relaxation Steps.")
+    println(Summary_File, "$MC_Equilibrium_Steps Equilibrium Steps")
+    println(Summary_File, "Measurements Every $MC_Measurement Steps.")
+    println(Summary_File, "$N_Measurements Total Measurements.\n")
+    println(Summary_File, "< E / N > = $(round(mean(Energy_Array[1:end - 1]), digits = 6)) ± $(round(std(Energy_Array[1:end - 1]), digits = 6))")
+    println(Summary_File, "< N > = $(round(V*mean(Density_Array[1:end - 1]), digits = 6)) ± $(round(V*std(Density_Array[1:end - 1]), digits = 6))")
+    println(Summary_File, "< Density > = $(round(mean(Density_Array[1:end - 1]), digits = 6)) ± $(round(std(Density_Array[1:end - 1]), digits = 6))")
     close(Summary_File)
 
     Povray_ini(h, ChemPot, T, λ_w, convert(Int64, floor(N_Measurements / 25)))
     Povray_Pov(h, L, ChemPot, T, σ_w, λ_w)
-    run(`povray $Output_Route/Positions/MC_Animation.ini`)
+    #run(`povray $Output_Route/Positions/MC_Animation.ini`)
+
+    return mean(Density_Array[1:end - 1]), std(Density_Array[1:end - 1])
 end
 
 function Movement(h::Float64, L::Float64, Beta::Float64, z_Displacement::Float64, Displacement::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, N_Slates::Int64, Energy::Float64, N_Movement_Accepted::Int64, N_Movement_Rejected::Int64, N_Displacement_Accepted::Int64, R_Cut::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
@@ -711,7 +720,7 @@ function Distribution(N_Bins::Int64, L::Float64, x::Array{Float64, 1})
 end
 
 function Povray_Pov(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::Float64, λ_w::Float64)
-    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_h_$(h)_T_$(round(T, digits = 2))_lambdaw_$(λ_w)/Positions"
+    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_T_$(round(T, digits = 2))/h_$(h)_lambdaw_$(λ_w)/Positions"
     Pov_File = open("$Output_Route/MC_Animation.pov", "w");
     println(Pov_File, "global_settings {\n\tambient_light rgb <0.2, 0.2, 0.2>\tmax_trace_level 15\n}\n")
     println(Pov_File, "background { color rgb <1, 1, 1> }\n")
@@ -739,7 +748,7 @@ function Povray_Pov(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::
 end
 
 function Povray_ini(h::Float64, ChemPot::Float64, T::Float64, λ_w::Float64, Frames::Int64)
-    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_h_$(h)_T_$(round(T, digits = 2))_lambdaw_$(λ_w)/Positions"
+    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_T_$(round(T, digits = 2))/h_$(h)_lambdaw_$(λ_w)/Positions"
     mkpath("$Output_Route")
     Ini_File = open("$Output_Route/MC_Animation.ini", "w");
     println(Ini_File, "Input_File_Name = $Output_Route/MC_Animation.pov")
@@ -753,4 +762,31 @@ function Povray_ini(h::Float64, ChemPot::Float64, T::Float64, λ_w::Float64, Fra
     close(Ini_File)
 end
 
-@time Mezei(-3., 10., 20., 2.)
+function Cycled_Mezei()
+    ChemPot = -3.;
+    L = 20.;
+    H = range(2., 10., step = 1.);
+    T = 2.;
+    σ_p, λ_p = 0.5, 1.5;
+    σ_w, λ_w = 0.5, 1.0;
+
+    Mean_Density = zeros(Float64, length(H));
+    Std_Density = zeros(Float64, length(H));
+    j = 1;
+
+    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_T_$(round(T, digits = 2))"
+    mkpath("$Output_Route")
+    Density_File = open("$Output_Route/Density_lambda_$λ_w.dat", "w");
+    println(Density_File, "h\tDensity\tErrorDensity")
+    for h in H
+        Mean_Density[j], Std_Density[j] = Mezei(ChemPot, h, L, T, σ_p, λ_p, σ_w, λ_w);
+        println(Density_File, "$h\t$(Mean_Density[j])\t$(Std_Density[j])")
+        j += 1;
+    end
+    close(Density_File)
+
+    Average_Density_Plot = plot(Mean_Density, yerror = Std_Density, label = "T = $T", xlabel = "Slit Separation [Lz]", ylabel= "< Density > [Unitless]", width = 3, ylims = (0, findmax(Mean_Density)[1] + 0.05 ), size = [1200, 800])
+    savefig(Average_Density_Plot, "$Output_Route/Density_lambda_$λ_w")
+end
+
+@time Cycled_Mezei()

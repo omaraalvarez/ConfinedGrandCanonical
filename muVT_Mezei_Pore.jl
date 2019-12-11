@@ -95,17 +95,17 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
             println("U / N = $(round(Energy / length(x), digits = 6))")
             println("N = $(length(x))")
             println("Density = $(round(length(x) / V, digits = 6))")
-            println("Displacement = $(round(Displacement, digits = 6))")
-            println("Z Displacement = $(round(z_Displacement, digits = 6))")
+            println("Max Displacement = $(round(Displacement, digits = 6))")
+            println("Max Z Displacement = $(round(z_Displacement, digits = 6))")
             println("Movements: $N_Movement")
-            println("   Accepted: $N_Movement_Accepted")
-            println("   Rejected: $N_Movement_Rejected")
+            println("   Accepted: $N_Movement_Accepted ($(100N_Movement_Accepted / N_Movement)%)")
+            println("   Rejected: $N_Movement_Rejected ($(100N_Movement_Rejected / N_Movement)%)")
             println("Insertions: $N_Insertion")
-            println("   Accepted: $N_Insertion_Accepted")
-            println("   Rejected: $N_Insertion_Rejected")
+            println("   Accepted: $N_Insertion_Accepted ($(100N_Insertion_Accepted / N_Insertion)%)")
+            println("   Rejected: $N_Insertion_Rejected ($(100N_Insertion_Rejected / N_Insertion)%)")
             println("Removal: $N_Removal")
-            println("   Accepted: $N_Removal_Accepted")
-            println("   Rejected: $N_Removal_Rejected")
+            println("   Accepted: $N_Removal_Accepted ($(100N_Removal_Accepted / N_Removal)%)")
+            println("   Rejected: $N_Removal_Rejected ($(100N_Removal_Rejected / N_Removal)%)")
             println("")
             N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0;
             N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0;
@@ -117,17 +117,17 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
             println("U / N = $(round(Energy / length(x), digits = 6))")
             println("N = $(length(x))")
             println("Density = $(round(length(x) / V, digits = 6))")
-            println("Displacement = $Displacement")
-            println("Z Displacement = $(round(z_Displacement, digits = 6))")
+            println("Max Displacement = $Displacement")
+            println("Max Z Displacement = $(round(z_Displacement, digits = 6))")
             println("Movements: $N_Movement")
-            println("   Accepted: $N_Movement_Accepted")
-            println("   Rejected: $N_Movement_Rejected")
+            println("   Accepted: $N_Movement_Accepted ($(100N_Movement_Accepted / N_Movement)%)")
+            println("   Rejected: $N_Movement_Rejected ($(100N_Movement_Rejected / N_Movement)%)")
             println("Insertions: $N_Insertion")
-            println("   Accepted: $N_Insertion_Accepted")
-            println("   Rejected: $N_Insertion_Rejected")
+            println("   Accepted: $N_Insertion_Accepted ($(100N_Insertion_Accepted / N_Insertion)%)")
+            println("   Rejected: $N_Insertion_Rejected ($(100N_Insertion_Rejected / N_Insertion)%)")
             println("Removal: $N_Removal")
-            println("   Accepted: $N_Removal_Accepted")
-            println("   Rejected: $N_Removal_Rejected")
+            println("   Accepted: $N_Removal_Accepted ($(100N_Removal_Accepted / N_Removal)%)")
+            println("   Rejected: $N_Removal_Rejected ($(100N_Removal_Rejected / N_Removal)%)")
             println("")
             N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0;
             N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0;
@@ -350,7 +350,7 @@ function Movement(h::Float64, L::Float64, Beta::Float64, z_Displacement::Float64
     x[j] += Displacement * (rand() - 0.5);
     x[j] = PeriodicBoundaryConditions(L, x[j]);
     y[j] += Displacement * (rand() - 0.5);
-    y[j] = PeriodicBoundaryConditions(L, x[j]);
+    y[j] = PeriodicBoundaryConditions(L, y[j]);
     z[j] += Displacement * (rand() - 0.5);
     Energy_New = Energy_Calculation(h, L, R_Cut, σ_p, λ_p, σ_w, λ_w, N_Slates, x[j], y[j], z[j], x, y, z);
     Delta_E = Energy_New - Energy_Old;

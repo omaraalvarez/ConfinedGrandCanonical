@@ -4,8 +4,8 @@ using Test;
 
 function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Number_Run::Int64, Total_Run::Int64, R_Cut::Float64 = 3.)
     """     CONFIGURATIONAL STEPS       """
-    MC_Relaxation_Steps = 1_000_000;
-    MC_Equilibrium_Steps = 5_000_000;
+    MC_Relaxation_Steps = 5000#1_000_000;
+    MC_Equilibrium_Steps = 20000#5_000_000;
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps;
     """     VARIABLE INITIALIZATION     """
     x, y, z = Float64[], Float64[], Float64[];
@@ -29,6 +29,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
     PotentialFunction = zeros(Float64, N_Bins);
     Delta = h / N_Bins;
     ρ_Max = 1 / ( (4. / 3.) * π * σ_p^3 );
+    N_Image = 1;
     """     OUTPUT FILES        """
     Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/lambdaw_$(λ_w)/h_$(h)"
     mkpath("$Output_Route/Positions")
@@ -42,12 +43,8 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
     println(Density_File, "#\tDensity")
     """          SLABS CREATION    """
     N_Slab = 2 * convert(Int64, ceil(L / (2σ_w) + 3 + 1) * ceil(L / (√3 * 2σ_w) + √3))
-    File_Slabs_Avogadro = open("$Output_Route/Slab_Avogadro.xyz", "w+")
-    println(File_Slabs_Avogadro, "$N_Slab\n")
     File_Slabs_Povray = open("$Output_Route/Positions/Slab.xyz", "w+")
     for i_y = 1:ceil(L / (√3 * 2σ_w) + √3), i_x = 1:ceil(L / (2σ_w) + 3 + 1)
-        println(File_Slabs_Avogadro, "H\t$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w)\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w)\t$(h / 2 + σ_w)")
-        println(File_Slabs_Avogadro, "H\t$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w)\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w)\t$(h / 2 + σ_w)")
         if i_x == ceil(L / (2σ_w) + 3 + 1) && i_y == ceil(L / (√3 * 2σ_w) + √3)
             println(File_Slabs_Povray, "$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w),\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w),\t$(h / 2 + σ_w),")
             println(File_Slabs_Povray, "$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w),\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w),\t$(h / 2 + σ_w)")
@@ -56,7 +53,6 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
             println(File_Slabs_Povray, "$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w),\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w),\t$(h / 2 + σ_w),")
         end
     end
-    close(File_Slabs_Avogadro)
     close(File_Slabs_Povray)
     """     SIMULATIONS CYCLES      """
     @inbounds for i = 1:MC_Steps
@@ -107,6 +103,14 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
             N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0;
             N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0;
             N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0;
+        end
+
+        if i > MC_Relaxation_Steps && i % .05MC_Equilibrium_Steps == 0
+            Positions_File = open("$Output_Route/Positions/Pos_$N_Image.xyz", "w");
+            for i = 1:length(x)
+                i != length(x) ? println(Positions_File, "$(x[i]),\t$(y[i]),\t$(z[i]),") : println(Positions_File, "$(x[i]),\t$(y[i]),\t$(z[i])")
+            end
+            N_Image += 1
         end
 
         i == MC_Relaxation_Steps ? println("~~~    STARTING MEASUREMENT STEPS    ~~~") : nothing
@@ -165,12 +169,6 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
                 g_y[N_Measurements, :] = Distribution(N_Bins, L, y);
                 g_z[N_Measurements, :] = Distribution(N_Bins, h, z);
                 PotentialFunction += Potential(N_Bins, L, h, σ_w, λ_w, x, y, z)
-                if N_Measurements % 500 == 0
-                    Positions_File = open("$Output_Route/Positions/Pos_$(convert(Int64, N_Measurements / 500)).xyz", "w");
-                    for i = 1:length(x)
-                        i != length(x) ? println(Positions_File, "$(x[i]),\t$(y[i]),\t$(z[i]),") : println(Positions_File, "$(x[i]),\t$(y[i]),\t$(z[i])")
-                    end
-                end
             end
             if N_Displacement_Accepted / N_Displacement > 0.55
                 Displacement *= 1.05
@@ -305,13 +303,10 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
     println(Summary_File, "< Density > = $(round(mean(Density_Array[1:end - 1]), digits = 6)) ± $(round(std(Density_Array[1:end - 1]), digits = 6))")
     close(Summary_File)
 
-    Povray_ini(h, ChemPot, T, λ_w, convert(Int64, floor(N_Measurements / 500)))
+    Povray_ini(h, ChemPot, T, λ_w, N_Image - 1)
     Povray_Pov(h, L, ChemPot, T, σ_w, λ_w)
-    run(`povray $Output_Route/Positions/Pore_Animation.ini`)
-
-    Povray_ini_Z_Axis(h, ChemPot, T, λ_w, convert(Int64, floor(N_Measurements / 500)))
+    Povray_ini_Z_Axis(h, ChemPot, T, λ_w, N_Image - 1)
     Povray_Pov_Z_Axis(h, L, ChemPot, T, σ_w, λ_w)
-    run(`povray $Output_Route/Positions/Pore_Z_Axis_Animation.ini`)
 
     return mean(Density_Array[1:end - 1]), std(Density_Array[1:end - 1]), Energy_Plot, Energy_Histogram, Average_Energy_Plot, Density_Plot, Density_Histogram, Average_Density_Plot, Distribution_x_Plot, Distribution_y_Plot, Distribution_z_Plot
 end
@@ -645,6 +640,12 @@ function Distribution(N_Bins::Int64, L::Float64, x::Array{Float64, 1})
 end
 
 function Povray_Pov(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::Float64, λ_w::Float64)
+    Particle_r, Particle_g, Particle_b, Particle_t = 174/255, 214/255, 241/255, 0;
+    Slab_Attractive_r, Slab_Attractive_g, Slab_Attractive_b, Slab_Attractive_t = 26/255, 35/255, 126/255, 0; 
+    Slab_Neutral_r, Slab_Neutral_g, Slab_Neutral_b, Slab_Neutral_t  = 77/255, 86/255, 86/255, 0; 
+    Slab_Repulsive_r, Slab_Repulsive_g, Slab_Repulsive_b, Slab_Repulsive_t = 183/255, 28/255, 28/255, 0;
+    Wall_r, Wall_g, Wall_b, Wall_t = 174/255, 214/255, 241/255, 0.5;
+
     Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/lambdaw_$(λ_w)/h_$(h)/Positions"
     Pov_File = open("$Output_Route/Pore_Animation.pov", "w");
     println(Pov_File, "global_settings {\n\tambient_light rgb <0.2, 0.2, 0.2>\tmax_trace_level 15\n}\n")
@@ -655,24 +656,32 @@ function Povray_Pov(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::
     println(Pov_File, "light_source {\n\t<0, $(+5L), 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<$(-5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<$(+5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
-    println(Pov_File, "#macro Particle(rx, ry, rz)\n\tintersection {\n\t\t\tsphere {\n\t\t\t<rx, ry, rz>, 0.5\n\t\t\tpigment {rgbt <107/255, 173/255, 197/255, 0> }\n\t\t}\n\t\tbox {\n\t\t\t<-L/2, -L/2, h/2>,\t<L/2, L/2, -h/2>\n\t\t\tpigment {rgbt <107/255, 173/255, 197/255, 0> }\n\t\t}\n\tno_shadow}\n#end\n")
-    println(Pov_File, "#macro Slate(rx, ry, rz, sigma_w, lambda_w)\n\tunion{\n\t\tsphere {\n\t\t\t<rx, ry, rz>, sigma_w\n\t\t\tpigment {rgbt <0.75, 0.75, 0.75, 0> }\n\t\tno_shadow}\n\t\tsphere {\n\t\t\t<rx, ry, -rz>, sigma_w\n\t\t\tpigment {rgbt <0.75, 0.75, 0.75, 0> }\n\t\tno_shadow}\n\t}\n#end")
-    println(Pov_File, "#macro Walls(L, h)\n\tunion {\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, h / 2>, <-L / 2, L / 2, h / 2>, <L / 2, -L / 2, h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\tno_shadow}\n\t\ttriangle {\n\t\t\t<-L / 2, -L / 2, h / 2>, <-L / 2, L / 2, h / 2>, <L / 2, -L / 2, h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\tno_shadow}\n\t}\n
-        union{\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h / 2>, <-L / 2, L / 2, -h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\t\ttriangle {\n\t\t\t<-L / 2, -L / 2, -h / 2>, <-L / 2, L / 2, -h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\tno_shadow}\n#end\n")
-    println(Pov_File, "#macro Box(L, h)\n\tunion{\n\t\ttriangle {\n\t\t\t<-L / 2, -L / 2, h /2>, <-L / 2, L / 2, h / 2>, <-L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\t\ttriangle {\n\t\t\t<-L / 2, L / 2, -h /2>, <-L / 2, L / 2, h / 2>, <-L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\t}
-        union {\n\t\ttriangle {\n\t\t\t<L / 2, -L / 2, h /2>, <L / 2, L / 2, h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h /2>, <L / 2, L / 2, h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\tno_shadow}\n\n\t
-        union {\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h /2>, <L / 2, L / 2, h / 2>, <-L / 2, L / 2, -h /2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\ntriangle {\n\t\t\t<-L / 2, L / 2, -h /2>, <-L / 2, L / 2, h / 2>, <L / 2, L / 2, h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\tno_shadow}\n#end")
+    println(Pov_File, "#macro Particle(rx, ry, rz)\n\tintersection {\n\t\t\tsphere {\n\t\t\t<rx, ry, rz>, 0.5\n\t\t\tpigment {rgbt <$Particle_r, $Particle_g, $Particle_b, $Particle_t> }\n\t\t}\n\t\tbox {\n\t\t\t<-L/2, -L/2, h/2>,\t<L/2, L/2, -h/2>\n\t\t\tpigment {rgbt <$Particle_r, $Particle_g, $Particle_b, $Particle_t> }\n\t\t}\n\tno_shadow}\n#end\n")
+    if λ_w > 1.
+        println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n\t\n\t\n\tsphere {\n\t\t<rx, ry, rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n#end")
+    else
+        println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n\tsphere {\n\t\t<rx, ry, rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n#end")
+    end    
+    println(Pov_File, "#macro Wall(L, h)\n\tunion{\n\t\ttriangle {\n\t\t\t<-L / 2, -L / 2, h /2>, <-L / 2, L / 2, h / 2>, <-L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\t\ttriangle {\n\t\t\t<-L / 2, L / 2, -h /2>, <-L / 2, L / 2, h / 2>, <-L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\t}
+        union {\n\t\ttriangle {\n\t\t\t<L / 2, -L / 2, h /2>, <L / 2, L / 2, h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h /2>, <L / 2, L / 2, h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\tno_shadow}\n\n\t
+        union {\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h /2>, <L / 2, L / 2, h / 2>, <-L / 2, L / 2, -h /2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\ntriangle {\n\t\t\t<-L / 2, L / 2, -h /2>, <-L / 2, L / 2, h / 2>, <L / 2, L / 2, h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\tno_shadow}\n#end")
     println(Pov_File, "#declare L = $L;\n#declare h = $h;")
     println(Pov_File, """#fopen File_Positions concat("$Output_Route/Pos_", str(clock, 1, 0), ".xyz") read""")
     println(Pov_File, "\t#while (defined( File_Positions ))\n\t\t#read (File_Positions, rx, ry, rz)\n\t\tParticle(rx, ry, -rz)\n\t\t#declare PBC = false;\n\t\t#if (rx > (L - 1) / 2)\n\t\t\t#declare rx = rx - L;\n\t\t\t#declare PBC = true;\n\t\t#end\n\t\t#if (rx < -(L - 1) / 2)\n\t\t\t#declare rx = rx + L;\n\t\t\t#declare PBC = true;\n\t\t#end\n\t\t
         #if (ry > (L - 1) / 2)\n\t\t\t#declare ry = ry - L;\n\t\t\t#declare PBC = true;\n\t\t#end\n\t\t#if (ry < -(L - 1) / 2)\n\t\t\t#declare ry = ry + L;\n\t\t\t#declare PBC = true;\n\t\t#end\n\t\t#if (PBC)\n\t\t\tParticle(rx, ry, -rz)\n\t\t#end\n\t#end\n#fclose File_Positions")
-    println(Pov_File, """#fopen File_Slate "$Output_Route/Slab.xyz" read""")
-    println(Pov_File, "#while (defined (File_Slate)) \n\t#read (File_Slate, rx, ry, rz)\n\tSlate(rx, ry, rz, $σ_w, $λ_w)\n#end\n#fclose File_Slate")
-    println(Pov_File, "Box(L, h)")
+    println(Pov_File, """#fopen File_Slab "$Output_Route/Slab.xyz" read""")
+    println(Pov_File, "#while (defined (File_Slab)) \n\t#read (File_Slab, rx, ry, rz)\n\tSlab(rx, ry, rz, $σ_w, $λ_w)\n#end\n#fclose File_Slab")
+    println(Pov_File, "Wall(L, h)")
     close(Pov_File)
 end
 
 function Povray_Pov_Z_Axis(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::Float64, λ_w::Float64)
+    Particle_r, Particle_g, Particle_b, Particle_t = 174/255, 214/255, 241/255, 0;
+    Slab_Attractive_r, Slab_Attractive_g, Slab_Attractive_b, Slab_Attractive_t = 26/255, 35/255, 126/255, 0; 
+    Slab_Neutral_r, Slab_Neutral_g, Slab_Neutral_b, Slab_Neutral_t  = 77/255, 86/255, 86/255, 0; 
+    Slab_Repulsive_r, Slab_Repulsive_g, Slab_Repulsive_b, Slab_Repulsive_t = 183/255, 28/255, 28/255, 0;
+    Wall_r, Wall_g, Wall_b, Wall_t = 174/255, 214/255, 241/255, 0.5;
+    
     Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/lambdaw_$(λ_w)/h_$(h)/Positions"
     Pov_File = open("$Output_Route/Pore_Z_Axis_Animation.pov", "w");
     println(Pov_File, "global_settings {\n\tambient_light rgb <0.2, 0.2, 0.2>\tmax_trace_level 15\n}\n")
@@ -683,20 +692,23 @@ function Povray_Pov_Z_Axis(h::Float64, L::Float64, ChemPot::Float64, T::Float64,
     println(Pov_File, "light_source {\n\t<0, $(+5L), 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<$(-5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<$(+5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
-    println(Pov_File, "#macro Particle(rx, ry, rz)\n\tintersection {\n\t\t\tsphere {\n\t\t\t<rx, ry, rz>, 0.5\n\t\t\tpigment {rgbt <107/255, 173/255, 197/255, 0> }\n\t\t}\n\t\tbox {\n\t\t\t<-L/2, -L/2, h/2>,\t<L/2, L/2, -h/2>\n\t\t\tpigment {rgbt <107/255, 173/255, 197/255, 0> }\n\t\t}\n\tno_shadow}\n#end\n")
-    println(Pov_File, "#macro Slate(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <0.75, 0.75, 0.75, 0> }\n\tno_shadow}\n\t\n#end")
-    println(Pov_File, "#macro Walls(L, h)\n\tunion {\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, h / 2>, <-L / 2, L / 2, h / 2>, <L / 2, -L / 2, h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\tno_shadow}\n\t\ttriangle {\n\t\t\t<-L / 2, -L / 2, h / 2>, <-L / 2, L / 2, h / 2>, <L / 2, -L / 2, h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\tno_shadow}\n\t}\n
-        union{\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h / 2>, <-L / 2, L / 2, -h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\t\ttriangle {\n\t\t\t<-L / 2, -L / 2, -h / 2>, <-L / 2, L / 2, -h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\tno_shadow}\n#end\n")
-    println(Pov_File, "#macro Box(L, h)\n\tunion{\n\t\ttriangle {\n\t\t\t<-L / 2, -L / 2, h /2>, <-L / 2, L / 2, h / 2>, <-L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\t\ttriangle {\n\t\t\t<-L / 2, L / 2, -h /2>, <-L / 2, L / 2, h / 2>, <-L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\t}
-        union {\n\t\ttriangle {\n\t\t\t<L / 2, -L / 2, h /2>, <L / 2, L / 2, h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h /2>, <L / 2, L / 2, h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\tno_shadow}\n\n\t
-        union {\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h /2>, <L / 2, L / 2, h / 2>, <-L / 2, L / 2, -h /2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\ntriangle {\n\t\t\t<-L / 2, L / 2, -h /2>, <-L / 2, L / 2, h / 2>, <L / 2, L / 2, h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\tno_shadow}\n#end")
+    println(Pov_File, "#macro Particle(rx, ry, rz)\n\tintersection {\n\t\t\tsphere {\n\t\t\t<rx, ry, rz>, 0.5\n\t\t\tpigment {rgbt <$Particle_r, $Particle_g, $Particle_b, $Particle_t> }\n\t\t}\n\t\tbox {\n\t\t\t<-L/2, -L/2, h/2>,\t<L/2, L/2, -h/2>\n\t\t\tpigment {rgbt <$Particle_r, $Particle_g, $Particle_b, $Particle_t> }\n\t\t}\n\tno_shadow}\n#end\n")
+    if λ_w > 1.
+        println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n\t\n#end")
+    else
+        println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n\t\n#end")
+    end    
+    println(Pov_File, "#macro Wall(L, h)\n\tunion{\n\t\ttriangle {\n\t\t\t<-L / 2, -L / 2, h /2>, <-L / 2, L / 2, h / 2>, <-L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\t\ttriangle {\n\t\t\t<-L / 2, L / 2, -h /2>, <-L / 2, L / 2, h / 2>, <-L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\t}
+        union {\n\t\ttriangle {\n\t\t\t<L / 2, -L / 2, h /2>, <L / 2, L / 2, h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h /2>, <L / 2, L / 2, h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\tno_shadow}\n\n\t
+        union {\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h /2>, <L / 2, L / 2, h / 2>, <-L / 2, L / 2, -h /2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\ntriangle {\n\t\t\t<-L / 2, L / 2, -h /2>, <-L / 2, L / 2, h / 2>, <L / 2, L / 2, h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\tno_shadow}\n
+        union {\n\t\ttriangle {\n\t\t\t<L / 2, -L / 2, -h /2>, <L / 2, -L / 2, h / 2>, <-L / 2, -L / 2, -h /2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\ntriangle {\n\t\t\t<-L / 2, -L / 2, -h /2>, <-L / 2, -L / 2, h / 2>, <L / 2, -L / 2, h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\tno_shadow}\n#end")
     println(Pov_File, "#declare L = $L;\n#declare h = $h;")
     println(Pov_File, """#fopen File_Positions concat("$Output_Route/Pos_", str(clock, 1, 0), ".xyz") read""")
     println(Pov_File, "\t#while (defined( File_Positions ))\n\t\t#read (File_Positions, rx, ry, rz)\n\t\tParticle(rx, ry, -rz)\n\t\t#declare PBC = false;\n\t\t#if (rx > (L - 1) / 2)\n\t\t\t#declare rx = rx - L;\n\t\t\t#declare PBC = true;\n\t\t#end\n\t\t#if (rx < -(L - 1) / 2)\n\t\t\t#declare rx = rx + L;\n\t\t\t#declare PBC = true;\n\t\t#end\n\t\t
         #if (ry > (L - 1) / 2)\n\t\t\t#declare ry = ry - L;\n\t\t\t#declare PBC = true;\n\t\t#end\n\t\t#if (ry < -(L - 1) / 2)\n\t\t\t#declare ry = ry + L;\n\t\t\t#declare PBC = true;\n\t\t#end\n\t\t#if (PBC)\n\t\t\tParticle(rx, ry, -rz)\n\t\t#end\n\t#end\n#fclose File_Positions")
-    println(Pov_File, """#fopen File_Slate "$Output_Route/Slab.xyz" read""")
-    println(Pov_File, "#while (defined (File_Slate)) \n\t#read (File_Slate, rx, ry, rz)\n\tSlate(rx, ry, rz, $σ_w, $λ_w)\n#end\n#fclose File_Slate")
-    println(Pov_File, "Box(L, h)")
+    println(Pov_File, """#fopen File_Slab "$Output_Route/Slab.xyz" read""")
+    println(Pov_File, "#while (defined (File_Slab)) \n\t#read (File_Slab, rx, ry, rz)\n\tSlab(rx, ry, rz, $σ_w, $λ_w)\n#end\n#fclose File_Slab")
+    println(Pov_File, "Wall(L, h)")
     close(Pov_File)
 end
 
@@ -706,7 +718,7 @@ function Povray_ini(h::Float64, ChemPot::Float64, T::Float64, λ_w::Float64, Fra
     Ini_File = open("$Output_Route/Pore_Animation.ini", "w");
     println(Ini_File, "Input_File_Name = $Output_Route/Pore_Animation.pov")
     println(Ini_File, "Output_File_Name = $Output_Route/")
-    println(Ini_File, "+W1280 +H1024 +UA\n")
+    println(Ini_File, "+W800 +H800\n")
     println(Ini_File, "Initial_Frame = 1")
     println(Ini_File, "Final_Frame = $Frames")
     println(Ini_File, "Initial_Clock = 1")
@@ -721,13 +733,37 @@ function Povray_ini_Z_Axis(h::Float64, ChemPot::Float64, T::Float64, λ_w::Float
     Ini_File = open("$Output_Route/Pore_Z_Axis_Animation.ini", "w");
     println(Ini_File, "Input_File_Name = $Output_Route/Pore_Z_Axis_Animation.pov")
     println(Ini_File, "Output_File_Name = $Output_Route/")
-    println(Ini_File, "+W1280 +H1024 +UA\n")
+    println(Ini_File, "+W800 +H800\n")
     println(Ini_File, "Initial_Frame = 1")
     println(Ini_File, "Final_Frame = $Frames")
     println(Ini_File, "Initial_Clock = 1")
     println(Ini_File, "Final_Clock = $Frames\n")
     println(Ini_File, "Cyclic_Animation = off")
     close(Ini_File)
+end
+
+function Povray_Slab(L::Float64, ChemPot::Float64, T::Float64, σ_w::Float64, λ_w::Float64)
+    Slab_Attractive_r, Slab_Attractive_g, Slab_Attractive_b, Slab_Attractive_t = 26/255, 35/255, 126/255, 0; 
+    Slab_Neutral_r, Slab_Neutral_g, Slab_Neutral_b, Slab_Neutral_t  = 77/255, 86/255, 86/255, 0; 
+    Slab_Repulsive_r, Slab_Repulsive_g, Slab_Repulsive_b, Slab_Repulsive_t = 183/255, 28/255, 28/255, 0;
+    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/lambdaw_$(λ_w)/"
+    Pov_File = open("$Output_Route/Pore_Slab.pov", "w");
+    println(Pov_File, "global_settings {\n\tambient_light rgb <0.2, 0.2, 0.2>\tmax_trace_level 15\n}\n")
+    println(Pov_File, "background { color rgb <1, 1, 1> }\n")
+    println(Pov_File, "#default { finish {ambient .8 diffuse 1 specular 1 roughness .005 metallic 0.7 phong 1} }\n")
+    println(Pov_File, "camera {\n\tperspective\n\tlocation <0, 0, $(1.3L)>\n\tlook_at <0, 0, 0>\n}\n")
+    println(Pov_File, "light_source {\n\t<0, $(-5L), 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
+    println(Pov_File, "light_source {\n\t<0, $(+5L), 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
+    println(Pov_File, "light_source {\n\t<$(-5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
+    println(Pov_File, "light_source {\n\t<$(+5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
+    if λ_w > 1.
+        println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n\t\n#end")
+    else
+        println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n\t\n#end")
+    end
+    println(Pov_File, """#fopen File_Slab "$Output_Route/Slab.xyz" read""")
+    println(Pov_File, "#while (defined (File_Slab)) \n\t#read (File_Slab, rx, ry, rz)\n\tSlab(rx, ry, 0, $σ_w, $λ_w)\n#end\n#fclose File_Slab")
+    close(Pov_File)
 end
 
 function Cycled_Mezei()
@@ -805,6 +841,33 @@ function Cycled_Mezei()
     Average_Density_Plot = plot(H, Mean_Density, yerror = Std_Density, background_color_legend = false, foreground_color_legend = false, legend = :topleft, label = "T = $T", xlabel = "Pore Separation [h]", ylabel= "< Density > [Unitless]", width = 3, ylims = (0, findmax(Mean_Density)[1] + 0.05 ), size = [1920, 1080])
     savefig(Average_Density_Plot, "$Output_Route/Density_T_$T")
     close(Density_File)
+
+    N_Slab = 2 * convert(Int64, ceil(L / (2σ_w) + 3 + 1) * ceil(L / (√3 * 2σ_w) + √3))
+    File_Slabs_Avogadro = open("$Output_Route/Slab_Avogadro.xyz", "w+")
+    println(File_Slabs_Avogadro, "$N_Slab\n")
+    File_Slabs_Povray = open("$Output_Route/Slab.xyz", "w+")
+    for i_y = 1:ceil(L / (√3 * 2σ_w) + √3), i_x = 1:ceil(L / (2σ_w) + 3 + 1)
+        println(File_Slabs_Avogadro, "H\t$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w)\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w)\t0.")
+        println(File_Slabs_Avogadro, "H\t$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w)\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w)\t0.")
+        if i_x == ceil(L / (2σ_w) + 3 + 1) && i_y == ceil(L / (√3 * 2σ_w) + √3)
+            println(File_Slabs_Povray, "$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w),\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w),\t0.,")
+            println(File_Slabs_Povray, "$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w),\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w),\t0.")
+        else
+            println(File_Slabs_Povray, "$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w),\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w),\t0.,")
+            println(File_Slabs_Povray, "$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w),\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w),\t0.,")
+        end
+    end
+    close(File_Slabs_Avogadro)
+    close(File_Slabs_Povray)
+
+    Povray_Slab(L, ChemPot, T, σ_w, λ_w)
+
+    for h in H
+        run(`povray $Output_Route/h_$h/Positions/Pore_Animation.ini`)
+        run(`povray $Output_Route/h_$h/Positions/Pore_Z_Axis_Animation.ini`)
+    end
+    run(`povray $Output_Route/Pore_Slab.pov +W800 +H800`)
+
 end
 
 @time Cycled_Mezei()

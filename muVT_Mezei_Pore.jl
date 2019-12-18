@@ -2,10 +2,10 @@ using Statistics;
 using Plots;
 using Test;
 
-function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Number_Run::Int64, Total_Run::Int64, R_Cut::Float64 = 3.)
+function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Number_Run::Int64, Total_Run::Int64, Patch_Percentage::Int64, R_Cut::Float64 = 3.)
     """     CONFIGURATIONAL STEPS       """
-    MC_Relaxation_Steps = 5000#1_000_000;
-    MC_Equilibrium_Steps = 20000#5_000_000;
+    MC_Relaxation_Steps = 1_000_000;
+    MC_Equilibrium_Steps = 5_000_000;
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps;
     """     VARIABLE INITIALIZATION     """
     x, y, z = Float64[], Float64[], Float64[];
@@ -30,8 +30,9 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
     Delta = h / N_Bins;
     ρ_Max = 1 / ( (4. / 3.) * π * σ_p^3 );
     N_Image = 1;
+    Patch_Radius = round(sqrt(L^2 * Patch_Percentage / 314) , digits = 6)
     """     OUTPUT FILES        """
-    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/lambdaw_$(λ_w)/h_$(h)"
+    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/Patch_$Patch_Percentage%/h_$(h)"
     mkpath("$Output_Route/Positions")
     Average_Energy_File = open("$Output_Route/Average_Energy.dat", "w");
     println(Average_Energy_File, "#\t< E / N >")
@@ -68,6 +69,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
             println("Density = $(round(length(x) / V, digits = 6))")
             println("Max Displacement = $(round(Displacement, digits = 6))")
             println("Max Z Displacement = $(round(z_Displacement, digits = 6))")
+            println("Patch Radius: $Patch_Radius\tPatch Percetage: $Patch_Percentage%")
             println("Movements: $N_Movement")
             println("   Accepted: $N_Movement_Accepted ($(round(100N_Movement_Accepted / N_Movement, digits = 2))%)")
             println("   Rejected: $N_Movement_Rejected ($(round(100N_Movement_Rejected / N_Movement, digits = 2))%)")
@@ -90,6 +92,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
             println("Density = $(round(length(x) / V, digits = 6))")
             println("Max Displacement = $(round(Displacement, digits = 6))")
             println("Max Z Displacement = $(round(z_Displacement, digits = 6))")
+            println("Patch Radius: $Patch_Radius\tPatch Percetage: $Patch_Percentage%")
             println("Movements: $N_Movement")
             println("   Accepted: $N_Movement_Accepted ($(round(100N_Movement_Accepted / N_Movement, digits = 2))%)")
             println("   Rejected: $N_Movement_Rejected ($(round(100N_Movement_Rejected / N_Movement, digits = 2))%)")
@@ -118,7 +121,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
         if RN == 1 && length(x) > 1
             N_Movement += 1;
             N_Displacement += 1;
-            Energy, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted = Movement(h, L, Beta, z_Displacement, Displacement, σ_p, λ_p, σ_w, λ_w, Energy, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted, R_Cut, x, y, z)
+            Energy, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted = Movement(Patch_Radius, h, L, Beta, z_Displacement, Displacement, σ_p, λ_p, σ_w, λ_w, Energy, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted, R_Cut, x, y, z)
         end
         if RN == 2
             N_Insertion += 1;
@@ -126,9 +129,9 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
             Pc, Pc_Sum, Pc_N, x_Insertion, y_Insertion, z_Insertion = Random_Excluded_Volume(2σ_p, h, L, σ_w, Pc, Pc_Sum, Pc_N, x, y, z)
             #Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N = Analytic_Excluded_Volume(2σ_p, L, V, Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N, x, y, z)
             if length(x_Insertion) > 0
-                Energy, N_Insertion_Accepted, N_Insertion_Rejected = Insertion_Mezei(h, Beta, ChemPot, L, V, R_Cut, σ_p, λ_p, σ_w, λ_w, Energy, N_Insertion_Accepted, N_Insertion_Rejected, x, y, z, x_Insertion, y_Insertion, z_Insertion, Pc)
+                Energy, N_Insertion_Accepted, N_Insertion_Rejected = Insertion_Mezei(Patch_Radius, h, Beta, ChemPot, L, V, R_Cut, σ_p, λ_p, σ_w, λ_w, Energy, N_Insertion_Accepted, N_Insertion_Rejected, x, y, z, x_Insertion, y_Insertion, z_Insertion, Pc)
             else
-                Energy, N_Insertion_Accepted, N_Insertion_Rejected = Insertion(h, L, V, ChemPot, Beta, R_Cut, σ_p, λ_p, σ_w, λ_w, x, y, z, Energy, N_Insertion_Accepted, N_Insertion_Rejected)
+                Energy, N_Insertion_Accepted, N_Insertion_Rejected = Insertion(Patch_Radius, h, L, V, ChemPot, Beta, R_Cut, σ_p, λ_p, σ_w, λ_w, x, y, z, Energy, N_Insertion_Accepted, N_Insertion_Rejected)
             end
         end
         if RN == 3 && length(x) > 1
@@ -143,9 +146,9 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
                 end
             end
             if rand() > (1 - Pc_Interpolation)^1000
-                Energy, N_Removal_Accepted, N_Removal_Rejected = Removal_Mezei(Pc_Interpolation, h, L, V, Beta, ChemPot, R_Cut, σ_p, λ_p, σ_w, λ_w, Energy, N_Removal_Accepted, N_Removal_Rejected, x, y, z);
+                Energy, N_Removal_Accepted, N_Removal_Rejected = Removal_Mezei(Patch_Radius, Pc_Interpolation, h, L, V, Beta, ChemPot, R_Cut, σ_p, λ_p, σ_w, λ_w, Energy, N_Removal_Accepted, N_Removal_Rejected, x, y, z);
             else
-                Energy, N_Removal_Accepted, N_Removal_Rejected = Removal(h, L, V, Beta, ChemPot, R_Cut, σ_p, λ_p, σ_w, λ_w, Energy, N_Removal_Accepted, N_Removal_Rejected, x, y, z)
+                Energy, N_Removal_Accepted, N_Removal_Rejected = Removal(Patch_Radius, h, L, V, Beta, ChemPot, R_Cut, σ_p, λ_p, σ_w, λ_w, Energy, N_Removal_Accepted, N_Removal_Rejected, x, y, z)
             end
         end
         if i % MC_Measurement == 0
@@ -216,7 +219,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
         println(g_y_File, "$(r[i])\t$(round(g_y_Mean[i], digits = 6))")
     end
     close(g_y_File)
-    Distribution_y_Plot = plot(r, g_y_Mean, ribbon = g_y_Std, fillalpha = 0.2, legend = false, xlabel = "y", ylabel = "Density", width = 3, size = [1200, 800], ylims = (0, g_y_Max))
+    Distribution_y_Plot = plot(r, g_y_Mean, ribbon = g_y_Std, fillalpha = 0.2, title = "Slit Separation = $h", legend = false, xlabel = "y", ylabel = "Density", width = 3, size = [1200, 800], ylims = (0, g_y_Max))
     savefig(Distribution_y_Plot, "$Output_Route/Density_y")
 
     g_z *= (N_Bins / V);
@@ -232,7 +235,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
         println(g_z_File, "$(r[i])\t$(round(g_z_Mean[i], digits = 6))")
     end
     close(g_z_File)
-    Distribution_z_Plot = plot(r, g_z_Mean, ribbon = g_z_Std, fillalpha = 0.2, legend = false, xlabel = "z", ylabel = "Density", width = 3, size = [1200, 800], ylims = (0, g_z_Max))
+    Distribution_z_Plot = plot(r, g_z_Mean, ribbon = g_z_Std, fillalpha = 0.2, title = "Slit Separation = $h", legend = false, xlabel = "z", ylabel = "Density", width = 3, size = [1200, 800], ylims = (0, g_z_Max))
     savefig(Distribution_z_Plot, "$Output_Route/Density_z")
 
     PotentialFunction /= N_Measurements;
@@ -242,7 +245,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
         println(Potential_File, "$(r[i])\t$(round(PotentialFunction[i], digits = 6))")
     end
     close(Potential_File)
-    Potential_Plot = plot(r, PotentialFunction, legend = false, xlabel = "z", ylabel = "U_wall(r)", width = 3, size = [1200, 800], ylims = (minimum(PotentialFunction), 0))
+    Potential_Plot = plot(r, PotentialFunction, title = "Slit Separation = $h", legend = false, xlabel = "z", ylabel = "U_wall(r)", width = 3, size = [1200, 800], ylims = (minimum(PotentialFunction), 0))
     savefig(Potential_Plot, "$Output_Route/Potential_Function")
 
     Pc_File = open("$Output_Route/Pc.dat", "w");
@@ -271,25 +274,25 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
     println("$MC_Equilibrium_Steps Equilibrium Steps")
     println("Measurements Every $MC_Measurement Steps.\n")
     println("< E / N > = $(round(mean(Energy_Array[1:end - 1]), digits = 6)) ± $(round(std(Energy_Array[1:end - 1]), digits = 6))")
-    Energy_Plot = plot(Energy_Array[1:end - 1], legend = false, xlabel = "Measurements", ylabel = "Energy [Unitless]", width = 3, size = [1200, 800])
+    Energy_Plot = plot(Energy_Array[1:end - 1], title = "Slit Separation = $h", legend = false, xlabel = "Measurements", ylabel = "Energy [Unitless]", width = 3, size = [1200, 800])
     hline!([mean(Energy_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Energy_Plot, "$Output_Route/Energy")
-    Energy_Histogram = histogram(Energy_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end - 1], bins = 20, legend = false, xlabel = "Energy [Unitless]", ylabel = "Frequency", size = [1200, 800])
+    Energy_Histogram = histogram(Energy_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end - 1], title = "Slit Separation = $h", bins = 20, legend = false, xlabel = "Energy [Unitless]", ylabel = "Frequency", size = [1200, 800])
     vline!([mean(Energy_Array)], color = :black, width = 2, linestyle = :dash)
     savefig(Energy_Histogram, "$Output_Route/Energy_Histogram")
-    Average_Energy_Plot = plot(Average_Energy_Array[1:end - 1], ribbon = σ_Energy, fillalpha = 0.2, legend = false, xlabel = "Measurements", ylabel = "< Energy > [Unitless]", width = 3, size = [1200, 800])
+    Average_Energy_Plot = plot(Average_Energy_Array[1:end - 1], ribbon = σ_Energy, fillalpha = 0.2, title = "Slit Separation = $h", legend = false, xlabel = "Measurements", ylabel = "< Energy > [Unitless]", width = 3, size = [1200, 800])
     hline!([mean(Energy_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Average_Energy_Plot, "$Output_Route/Average_Energy")
 
     println("< N > = $(round(V*mean(Density_Array[1:end - 1]), digits = 6)) ± $(round(V*std(Density_Array[1:end - 1]), digits = 6))")
     println("< Density > = $(round(mean(Density_Array[1:end - 1]), digits = 6)) ± $(round(std(Density_Array[1:end - 1]), digits = 6))")
-    Density_Plot = plot(Density_Array[1:end - 1], legend = false, xlabel = "Measurements", ylabel = "Density [Unitless]", width = 3, size = [1200, 800])
+    Density_Plot = plot(Density_Array[1:end - 1], title = "Slit Separation = $h", legend = false, xlabel = "Measurements", ylabel = "Density [Unitless]", width = 3, size = [1200, 800])
     hline!([mean(Density_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Density_Plot, "$Output_Route/Density")
-    Density_Histogram = histogram(Density_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end - 1], bins = 20, legend = false, xlabel = "Density [Unitless]", ylabel = "Frequency", size = [1200, 800])
+    Density_Histogram = histogram(Density_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end - 1], bins = 20, title = "Slit Separation = $h", legend = false, xlabel = "Density [Unitless]", ylabel = "Frequency", size = [1200, 800])
     vline!([mean(Density_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Density_Histogram, "$Output_Route/Density_Histogram")
-    Average_Density_Plot = plot(Average_Density_Array[1:end - 1], ribbon = σ_Density, fillalpha = 0.2, legend = false, xlabel = "Measurements", ylabel= "< Density > [Unitless]", width = 3, size = [1200, 800])
+    Average_Density_Plot = plot(Average_Density_Array[1:end - 1], ribbon = σ_Density, fillalpha = 0.2, title = "Slit Separation = $h", legend = false, xlabel = "Measurements", ylabel= "< Density > [Unitless]", width = 3, size = [1200, 800])
     hline!([mean(Density_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Average_Density_Plot, "$Output_Route/Average_Density")
 
@@ -303,24 +306,24 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
     println(Summary_File, "< Density > = $(round(mean(Density_Array[1:end - 1]), digits = 6)) ± $(round(std(Density_Array[1:end - 1]), digits = 6))")
     close(Summary_File)
 
-    Povray_ini(h, ChemPot, T, λ_w, N_Image - 1)
-    Povray_Pov(h, L, ChemPot, T, σ_w, λ_w)
-    Povray_ini_Z_Axis(h, ChemPot, T, λ_w, N_Image - 1)
-    Povray_Pov_Z_Axis(h, L, ChemPot, T, σ_w, λ_w)
+    Povray_ini(h, L, ChemPot, T, λ_w, N_Image - 1, Patch_Percentage)
+    Povray_Pov(h, L, ChemPot, T, σ_w, λ_w, Patch_Radius, Patch_Percentage)
+    Povray_ini_Z_Axis(h, L, ChemPot, T, λ_w, N_Image - 1, Patch_Percentage)
+    Povray_Pov_Z_Axis(h, L, ChemPot, T, σ_w, λ_w, Patch_Radius, Patch_Percentage)
 
     return mean(Density_Array[1:end - 1]), std(Density_Array[1:end - 1]), Energy_Plot, Energy_Histogram, Average_Energy_Plot, Density_Plot, Density_Histogram, Average_Density_Plot, Distribution_x_Plot, Distribution_y_Plot, Distribution_z_Plot
 end
 
-function Movement(h::Float64, L::Float64, Beta::Float64, z_Displacement::Float64, Displacement::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Energy::Float64, N_Movement_Accepted::Int64, N_Movement_Rejected::Int64, N_Displacement_Accepted::Int64, R_Cut::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
+function Movement(Patch_Radius::Float64, h::Float64, L::Float64, Beta::Float64, z_Displacement::Float64, Displacement::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Energy::Float64, N_Movement_Accepted::Int64, N_Movement_Rejected::Int64, N_Displacement_Accepted::Int64, R_Cut::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
     j = rand(1:length(x))
-    Energy_Old = Energy_Calculation(h, L, R_Cut, σ_p, λ_p, σ_w, λ_w, x[j], y[j], z[j], x, y, z)
+    Energy_Old = Energy_Calculation(Patch_Radius, h, L, R_Cut, σ_p, λ_p, σ_w, λ_w, x[j], y[j], z[j], x, y, z)
     x_Old, y_Old, z_Old = x[j], y[j], z[j];
     x[j] += Displacement * (rand() - 0.5);
     x[j] = PeriodicBoundaryConditions(L, x[j]);
     y[j] += Displacement * (rand() - 0.5);
     y[j] = PeriodicBoundaryConditions(L, y[j]);
     z[j] += z_Displacement * (rand() - 0.5);
-    Energy_New = Energy_Calculation(h, L, R_Cut, σ_p, λ_p, σ_w, λ_w, x[j], y[j], z[j], x, y, z);
+    Energy_New = Energy_Calculation(Patch_Radius, h, L, R_Cut, σ_p, λ_p, σ_w, λ_w, x[j], y[j], z[j], x, y, z);
     Delta_E = Energy_New - Energy_Old;
     if rand() < exp(-Beta * Delta_E)
         N_Movement_Accepted += 1;
@@ -335,11 +338,11 @@ function Movement(h::Float64, L::Float64, Beta::Float64, z_Displacement::Float64
     return Energy, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted
 end
 
-function Insertion(h::Float64, L::Float64, V::Float64, ChemPot::Float64, Beta::Float64, R_Cut::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, Energy::Float64, N_Insertion_Accepted::Int64, N_Insertion_Rejected::Int64)
+function Insertion(Patch_Radius::Float64, h::Float64, L::Float64, V::Float64, ChemPot::Float64, Beta::Float64, R_Cut::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, Energy::Float64, N_Insertion_Accepted::Int64, N_Insertion_Rejected::Int64)
     x_Insertion = L * (rand() - 0.5)
     y_Insertion = L * (rand() - 0.5)
     z_Insertion = h * (rand() - 0.5)
-    Energy_Insertion = Energy_Calculation(h, L, R_Cut, σ_p, λ_p, σ_w, λ_w, x_Insertion, y_Insertion, z_Insertion, x, y, z)
+    Energy_Insertion = Energy_Calculation(Patch_Radius, h, L, R_Cut, σ_p, λ_p, σ_w, λ_w, x_Insertion, y_Insertion, z_Insertion, x, y, z)
     if rand() < exp( Beta * (ChemPot - Energy_Insertion) + log(V / (length(x) + 1)) )
         N_Insertion_Accepted += 1;
         append!(x, x_Insertion)
@@ -352,9 +355,9 @@ function Insertion(h::Float64, L::Float64, V::Float64, ChemPot::Float64, Beta::F
     return Energy, N_Insertion_Accepted, N_Insertion_Rejected
 end
 
-function Insertion_Mezei(h::Float64, Beta::Float64, ChemPot::Float64, L::Float64, V::Float64, R_Cut::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Energy::Float64, N_Insertion_Accepted::Int64, N_Insertion_Rejected::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, x_Insertion::Array{Float64, 1}, y_Insertion::Array{Float64, 1}, z_Insertion::Array{Float64, 1}, Pc::Dict{Int64, Float64})
+function Insertion_Mezei(Patch_Radius::Float64, h::Float64, Beta::Float64, ChemPot::Float64, L::Float64, V::Float64, R_Cut::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Energy::Float64, N_Insertion_Accepted::Int64, N_Insertion_Rejected::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, x_Insertion::Array{Float64, 1}, y_Insertion::Array{Float64, 1}, z_Insertion::Array{Float64, 1}, Pc::Dict{Int64, Float64})
     j = rand(1:length(x_Insertion))
-    Energy_Insertion = Energy_Calculation(h, L, R_Cut, σ_p, λ_p, σ_w, λ_w, x_Insertion[j], y_Insertion[j], z_Insertion[j], x, y, z);
+    Energy_Insertion = Energy_Calculation(Patch_Radius, h, L, R_Cut, σ_p, λ_p, σ_w, λ_w, x_Insertion[j], y_Insertion[j], z_Insertion[j], x, y, z);
     if rand() < (V * Pc[length(x)] / (length(x) + 1) ) * exp(Beta * (ChemPot - Energy_Insertion))
         N_Insertion_Accepted += 1;
         append!(x, x_Insertion[j])
@@ -367,9 +370,9 @@ function Insertion_Mezei(h::Float64, Beta::Float64, ChemPot::Float64, L::Float64
     return Energy, N_Insertion_Accepted, N_Insertion_Rejected
 end
 
-function Removal(h::Float64, L::Float64, V::Float64, Beta::Float64, ChemPot::Float64, R_Cut::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Energy::Float64, N_Removal_Accepted::Int64, N_Removal_Rejected::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
+function Removal(Patch_Radius::Float64, h::Float64, L::Float64, V::Float64, Beta::Float64, ChemPot::Float64, R_Cut::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Energy::Float64, N_Removal_Accepted::Int64, N_Removal_Rejected::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
     j = rand(1:length(x));
-    Energy_Removal = Energy_Calculation(h, L, R_Cut, σ_p, λ_p, σ_w, λ_w, x[j], y[j], z[j], x, y, z)
+    Energy_Removal = Energy_Calculation(Patch_Radius, h, L, R_Cut, σ_p, λ_p, σ_w, λ_w, x[j], y[j], z[j], x, y, z)
     if rand() < exp( Beta * (Energy_Removal - ChemPot) + log(length(x) / V) )
         N_Removal_Accepted += 1;
         deleteat!(x, j)
@@ -382,9 +385,9 @@ function Removal(h::Float64, L::Float64, V::Float64, Beta::Float64, ChemPot::Flo
     return Energy, N_Removal_Accepted, N_Removal_Rejected 
 end
 
-function Removal_Mezei(Pc_Interpolation::Float64, h::Float64, L::Float64, V::Float64, Beta::Float64, ChemPot::Float64, R_Cut::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Energy::Float64, N_Removal_Accepted::Int64, N_Removal_Rejected::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
+function Removal_Mezei(Patch_Radius::Float64, Pc_Interpolation::Float64, h::Float64, L::Float64, V::Float64, Beta::Float64, ChemPot::Float64, R_Cut::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Energy::Float64, N_Removal_Accepted::Int64, N_Removal_Rejected::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
     j = rand(1:length(x))
-    Energy_Removal = Energy_Calculation(h, L, R_Cut, σ_p, λ_p, σ_w, λ_w, x[j], y[j], z[j], x, y, z)
+    Energy_Removal = Energy_Calculation(Patch_Radius, h, L, R_Cut, σ_p, λ_p, σ_w, λ_w, x[j], y[j], z[j], x, y, z)
     if rand() < ( length(x) / (V * Pc_Interpolation) ) * exp(Beta * (Energy_Removal - ChemPot))
         N_Removal_Accepted += 1;
         deleteat!(x, j)
@@ -407,14 +410,19 @@ function u_SquareWell(r2::Float64, σ::Float64, λ::Float64, e::Float64 = 1.)
     end
 end
 
-function Energy_Calculation(h::Float64, L::Float64, R_Cut::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, rx::Float64, ry::Float64, rz::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
+function Energy_Calculation(Patch_Radius::Float64, h::Float64, L::Float64, R_Cut::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, rx::Float64, ry::Float64, rz::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
     Energy = 0;
     for i_y = 1:ceil(L / (√3 * 2σ_w) + √3), i_x = 1:ceil(L / (2σ_w) + 3 + 1)
         Delta_x = rx - (- L / 2 - 3σ_w + (i_x - 1) * 2σ_w);
         Delta_y = ry - (- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w);
         Delta_z = abs(rz) - (h / 2 + σ_w)
         r2 = Delta_x^2 + Delta_y^2 + Delta_z^2;
-        Energy += u_SquareWell(r2, σ_w, λ_w);
+        r_center = sqrt( (- L / 2 - 3σ_w + (i_x - 1) * 2σ_w)^2 + (- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w)^2)
+        if sqrt(r_center) < Patch_Radius
+            Energy += u_SquareWell(r2, σ_w, λ_w, 1.0);
+        else
+            Energy += u_SquareWell(r2, σ_w, λ_w, 0.0);
+        end
         Delta_x = rx - (- L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w);
         Delta_y = ry - (- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w);
         Delta_z = abs(rz) - (h / 2 + σ_w)
@@ -639,14 +647,14 @@ function Distribution(N_Bins::Int64, L::Float64, x::Array{Float64, 1})
     return g
 end
 
-function Povray_Pov(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::Float64, λ_w::Float64)
+function Povray_Pov(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::Float64, λ_w::Float64, Patch_Radius::Float64, Patch_Percentage::Int64)
     Particle_r, Particle_g, Particle_b, Particle_t = 174/255, 214/255, 241/255, 0;
     Slab_Attractive_r, Slab_Attractive_g, Slab_Attractive_b, Slab_Attractive_t = 26/255, 35/255, 126/255, 0; 
     Slab_Neutral_r, Slab_Neutral_g, Slab_Neutral_b, Slab_Neutral_t  = 77/255, 86/255, 86/255, 0; 
     Slab_Repulsive_r, Slab_Repulsive_g, Slab_Repulsive_b, Slab_Repulsive_t = 183/255, 28/255, 28/255, 0;
     Wall_r, Wall_g, Wall_b, Wall_t = 174/255, 214/255, 241/255, 0.5;
 
-    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/lambdaw_$(λ_w)/h_$(h)/Positions"
+    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/Patch_$Patch_Percentage%/h_$(h)/Positions"
     Pov_File = open("$Output_Route/Pore_Animation.pov", "w");
     println(Pov_File, "global_settings {\n\tambient_light rgb <0.2, 0.2, 0.2>\tmax_trace_level 15\n}\n")
     println(Pov_File, "background { color rgb <1, 1, 1> }\n")
@@ -657,11 +665,12 @@ function Povray_Pov(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::
     println(Pov_File, "light_source {\n\t<$(-5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<$(+5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "#macro Particle(rx, ry, rz)\n\tintersection {\n\t\t\tsphere {\n\t\t\t<rx, ry, rz>, 0.5\n\t\t\tpigment {rgbt <$Particle_r, $Particle_g, $Particle_b, $Particle_t> }\n\t\t}\n\t\tbox {\n\t\t\t<-L/2, -L/2, h/2>,\t<L/2, L/2, -h/2>\n\t\t\tpigment {rgbt <$Particle_r, $Particle_g, $Particle_b, $Particle_t> }\n\t\t}\n\tno_shadow}\n#end\n")
-    if λ_w > 1.
-        println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n\t\n\t\n\tsphere {\n\t\t<rx, ry, rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n#end")
-    else
-        println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n\tsphere {\n\t\t<rx, ry, rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n#end")
-    end    
+    println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t#if (sqrt(pow(rx, 2) + pow(ry, 2)) <= $Patch_Radius)\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\nsphere {\n\t\t<rx, ry, rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n#else\nsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\nsphere {\n\t\t<rx, ry, rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n\t#end\n#end")
+    #if λ_w > 1.
+    #    println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n\t\n\t\n\tsphere {\n\t\t<rx, ry, rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n#end")
+    #else
+    #    println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n\tsphere {\n\t\t<rx, ry, rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n#end")
+    #end    
     println(Pov_File, "#macro Wall(L, h)\n\tunion{\n\t\ttriangle {\n\t\t\t<-L / 2, -L / 2, h /2>, <-L / 2, L / 2, h / 2>, <-L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\t\ttriangle {\n\t\t\t<-L / 2, L / 2, -h /2>, <-L / 2, L / 2, h / 2>, <-L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\t}
         union {\n\t\ttriangle {\n\t\t\t<L / 2, -L / 2, h /2>, <L / 2, L / 2, h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h /2>, <L / 2, L / 2, h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\tno_shadow}\n\n\t
         union {\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h /2>, <L / 2, L / 2, h / 2>, <-L / 2, L / 2, -h /2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\ntriangle {\n\t\t\t<-L / 2, L / 2, -h /2>, <-L / 2, L / 2, h / 2>, <L / 2, L / 2, h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\tno_shadow}\n#end")
@@ -675,14 +684,14 @@ function Povray_Pov(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::
     close(Pov_File)
 end
 
-function Povray_Pov_Z_Axis(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::Float64, λ_w::Float64)
+function Povray_Pov_Z_Axis(h::Float64, L::Float64, ChemPot::Float64, T::Float64, σ_w::Float64, λ_w::Float64, Patch_Radius::Float64, Patch_Percentage::Int64)
     Particle_r, Particle_g, Particle_b, Particle_t = 174/255, 214/255, 241/255, 0;
     Slab_Attractive_r, Slab_Attractive_g, Slab_Attractive_b, Slab_Attractive_t = 26/255, 35/255, 126/255, 0; 
     Slab_Neutral_r, Slab_Neutral_g, Slab_Neutral_b, Slab_Neutral_t  = 77/255, 86/255, 86/255, 0; 
     Slab_Repulsive_r, Slab_Repulsive_g, Slab_Repulsive_b, Slab_Repulsive_t = 183/255, 28/255, 28/255, 0;
     Wall_r, Wall_g, Wall_b, Wall_t = 174/255, 214/255, 241/255, 0.5;
     
-    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/lambdaw_$(λ_w)/h_$(h)/Positions"
+    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/Patch_$Patch_Percentage%/h_$(h)/Positions"
     Pov_File = open("$Output_Route/Pore_Z_Axis_Animation.pov", "w");
     println(Pov_File, "global_settings {\n\tambient_light rgb <0.2, 0.2, 0.2>\tmax_trace_level 15\n}\n")
     println(Pov_File, "background { color rgb <1, 1, 1> }\n")
@@ -693,11 +702,12 @@ function Povray_Pov_Z_Axis(h::Float64, L::Float64, ChemPot::Float64, T::Float64,
     println(Pov_File, "light_source {\n\t<$(-5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<$(+5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "#macro Particle(rx, ry, rz)\n\tintersection {\n\t\t\tsphere {\n\t\t\t<rx, ry, rz>, 0.5\n\t\t\tpigment {rgbt <$Particle_r, $Particle_g, $Particle_b, $Particle_t> }\n\t\t}\n\t\tbox {\n\t\t\t<-L/2, -L/2, h/2>,\t<L/2, L/2, -h/2>\n\t\t\tpigment {rgbt <$Particle_r, $Particle_g, $Particle_b, $Particle_t> }\n\t\t}\n\tno_shadow}\n#end\n")
-    if λ_w > 1.
-        println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n\t\n#end")
-    else
-        println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n\t\n#end")
-    end    
+    println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t#if (sqrt(pow(rx, 2) + pow(ry, 2)) <= $Patch_Radius)\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n#else\nsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n\t#end\n#end")
+    #if λ_w > 1.
+    #    println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n\t\n#end")
+    #else
+    #    println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n\t\n#end")
+    #end    
     println(Pov_File, "#macro Wall(L, h)\n\tunion{\n\t\ttriangle {\n\t\t\t<-L / 2, -L / 2, h /2>, <-L / 2, L / 2, h / 2>, <-L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\t\ttriangle {\n\t\t\t<-L / 2, L / 2, -h /2>, <-L / 2, L / 2, h / 2>, <-L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\t}
         union {\n\t\ttriangle {\n\t\t\t<L / 2, -L / 2, h /2>, <L / 2, L / 2, h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h /2>, <L / 2, L / 2, h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\tno_shadow}\n\n\t
         union {\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h /2>, <L / 2, L / 2, h / 2>, <-L / 2, L / 2, -h /2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\ntriangle {\n\t\t\t<-L / 2, L / 2, -h /2>, <-L / 2, L / 2, h / 2>, <L / 2, L / 2, h / 2>\n\t\t\tpigment { rgbt <$Wall_r, $Wall_g, $Wall_b, $Wall_t> }\n\t\t}\n\tno_shadow}\n
@@ -712,8 +722,8 @@ function Povray_Pov_Z_Axis(h::Float64, L::Float64, ChemPot::Float64, T::Float64,
     close(Pov_File)
 end
 
-function Povray_ini(h::Float64, ChemPot::Float64, T::Float64, λ_w::Float64, Frames::Int64)
-    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/lambdaw_$(λ_w)/h_$(h)/Positions"
+function Povray_ini(h::Float64, L::Float64, ChemPot::Float64, T::Float64, λ_w::Float64, Frames::Int64, Patch_Percentage::Int64)
+    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/Patch_$Patch_Percentage%/h_$(h)/Positions"
     mkpath("$Output_Route")
     Ini_File = open("$Output_Route/Pore_Animation.ini", "w");
     println(Ini_File, "Input_File_Name = $Output_Route/Pore_Animation.pov")
@@ -727,8 +737,8 @@ function Povray_ini(h::Float64, ChemPot::Float64, T::Float64, λ_w::Float64, Fra
     close(Ini_File)
 end
 
-function Povray_ini_Z_Axis(h::Float64, ChemPot::Float64, T::Float64, λ_w::Float64, Frames::Int64)
-    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/lambdaw_$(λ_w)/h_$(h)/Positions"
+function Povray_ini_Z_Axis(h::Float64, L::Float64, ChemPot::Float64, T::Float64, λ_w::Float64, Frames::Int64, Patch_Percentage::Int64)
+    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/Patch_$Patch_Percentage%/h_$(h)/Positions"
     mkpath("$Output_Route")
     Ini_File = open("$Output_Route/Pore_Z_Axis_Animation.ini", "w");
     println(Ini_File, "Input_File_Name = $Output_Route/Pore_Z_Axis_Animation.pov")
@@ -742,11 +752,11 @@ function Povray_ini_Z_Axis(h::Float64, ChemPot::Float64, T::Float64, λ_w::Float
     close(Ini_File)
 end
 
-function Povray_Slab(L::Float64, ChemPot::Float64, T::Float64, σ_w::Float64, λ_w::Float64)
+function Povray_Slab(L::Float64, ChemPot::Float64, T::Float64, σ_w::Float64, λ_w::Float64, Patch_Radius::Float64, Patch_Percentage::Int64)
     Slab_Attractive_r, Slab_Attractive_g, Slab_Attractive_b, Slab_Attractive_t = 26/255, 35/255, 126/255, 0; 
     Slab_Neutral_r, Slab_Neutral_g, Slab_Neutral_b, Slab_Neutral_t  = 77/255, 86/255, 86/255, 0; 
     Slab_Repulsive_r, Slab_Repulsive_g, Slab_Repulsive_b, Slab_Repulsive_t = 183/255, 28/255, 28/255, 0;
-    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/lambdaw_$(λ_w)/"
+    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/Patch_$Patch_Percentage%/"
     Pov_File = open("$Output_Route/Pore_Slab.pov", "w");
     println(Pov_File, "global_settings {\n\tambient_light rgb <0.2, 0.2, 0.2>\tmax_trace_level 15\n}\n")
     println(Pov_File, "background { color rgb <1, 1, 1> }\n")
@@ -756,11 +766,12 @@ function Povray_Slab(L::Float64, ChemPot::Float64, T::Float64, σ_w::Float64, λ
     println(Pov_File, "light_source {\n\t<0, $(+5L), 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<$(-5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<$(+5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
-    if λ_w > 1.
-        println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n\t\n#end")
-    else
-        println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n\t\n#end")
-    end
+    println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t#if (sqrt(pow(rx, 2) + pow(ry, 2)) <= $Patch_Radius)\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n#else\nsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n\t#end\n#end")
+    #if λ_w > 1.
+    #    println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Attractive_r, $Slab_Attractive_g, $Slab_Attractive_b, $Slab_Attractive_t> }\n\tno_shadow}\n\t\n#end")
+    #else
+    #    println(Pov_File, "#macro Slab(rx, ry, rz, sigma_w, lambda_w)\n\t\n\tsphere {\n\t\t<rx, ry, -rz>, sigma_w\n\t\tpigment {rgbt <$Slab_Neutral_r, $Slab_Neutral_g, $Slab_Neutral_b, $Slab_Neutral_t> }\n\tno_shadow}\n\t\n#end")
+    #end
     println(Pov_File, """#fopen File_Slab "$Output_Route/Slab.xyz" read""")
     println(Pov_File, "#while (defined (File_Slab)) \n\t#read (File_Slab, rx, ry, rz)\n\tSlab(rx, ry, 0, $σ_w, $λ_w)\n#end\n#fclose File_Slab")
     close(Pov_File)
@@ -774,11 +785,13 @@ function Cycled_Mezei()
     σ_p, λ_p = 0.5, 1.5;
     σ_w, λ_w = 0.5, 1.5;
 
+    Patch_Percentage = 80
+
     Mean_Density = zeros(Float64, length(H));
     Std_Density = zeros(Float64, length(H));
     j = 1;
 
-    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/lambdaw_$(λ_w)"
+    Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/Patch_$Patch_Percentage%/"
     mkpath("$Output_Route")
     Density_File = open("$Output_Route/Density_T_$(T)_lambda_$λ_w.dat", "w");
     println(Density_File, "h\tDensity\tErrorDensity")
@@ -793,7 +806,7 @@ function Cycled_Mezei()
     p_Average_Density = Array{Any, 1}(undef, length(H))
 
     for h in H
-        Mean_Density[j], Std_Density[j], p_Energy[j], p_Histogram_Energy[j], p_Average_Energy[j], p_Density[j], p_Histogram_Density[j], p_Average_Density[j], p_x[j], p_y[j], p_z[j]= Mezei(ChemPot, h, L, T, σ_p, λ_p, σ_w, λ_w, j, length(H));
+        Mean_Density[j], Std_Density[j], p_Energy[j], p_Histogram_Energy[j], p_Average_Energy[j], p_Density[j], p_Histogram_Density[j], p_Average_Density[j], p_x[j], p_y[j], p_z[j]= Mezei(ChemPot, h, L, T, σ_p, λ_p, σ_w, λ_w, j, length(H), Patch_Percentage);
         println(Density_File, "$h\t$(Mean_Density[j])\t$(Std_Density[j])")
         j += 1;
     end
@@ -847,9 +860,19 @@ function Cycled_Mezei()
     println(File_Slabs_Avogadro, "$N_Slab\n")
     File_Slabs_Povray = open("$Output_Route/Slab.xyz", "w+")
     for i_y = 1:ceil(L / (√3 * 2σ_w) + √3), i_x = 1:ceil(L / (2σ_w) + 3 + 1)
-        println(File_Slabs_Avogadro, "H\t$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w)\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w)\t0.")
-        println(File_Slabs_Avogadro, "H\t$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w)\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w)\t0.")
-        if i_x == ceil(L / (2σ_w) + 3 + 1) && i_y == ceil(L / (√3 * 2σ_w) + √3)
+        r = sqrt( (- L / 2 - 3σ_w + (i_x - 1) * 2σ_w)^2 + (- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w)^2)
+        if r < 5.
+            println(File_Slabs_Avogadro, "H\t$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w)\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w)\t0.")
+        else
+            println(File_Slabs_Avogadro, "Li\t$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w)\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w)\t0.")
+        end
+        r = sqrt( (- L / 2 - 3σ_w + (i_x - 1) * 2σ_w)^2 + (- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w)^2)
+        if r < 5.
+            println(File_Slabs_Avogadro, "H\t$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w)\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w)\t0.")
+        else
+            println(File_Slabs_Avogadro, "Li\t$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w)\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w)\t0.")
+        end
+            if i_x == ceil(L / (2σ_w) + 3 + 1) && i_y == ceil(L / (√3 * 2σ_w) + √3)
             println(File_Slabs_Povray, "$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w),\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w),\t0.,")
             println(File_Slabs_Povray, "$(- L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w),\t$(- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w),\t0.")
         else
@@ -860,7 +883,8 @@ function Cycled_Mezei()
     close(File_Slabs_Avogadro)
     close(File_Slabs_Povray)
 
-    Povray_Slab(L, ChemPot, T, σ_w, λ_w)
+    Patch_Radius = round(sqrt(L^2 * Patch_Percentage / 314) , digits = 6)
+    Povray_Slab(L, ChemPot, T, σ_w, λ_w, Patch_Radius, Patch_Percentage)
 
     for h in H
         run(`povray $Output_Route/h_$h/Positions/Pore_Animation.ini`)

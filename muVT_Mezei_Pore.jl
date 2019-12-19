@@ -4,8 +4,8 @@ using Test;
 
 function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Number_Run::Int64, Total_Run::Int64, Patch_Percentage::Int64, R_Cut::Float64 = 3.)
     """     CONFIGURATIONAL STEPS       """
-    MC_Relaxation_Steps = 1_000_000;
-    MC_Equilibrium_Steps = 5_000_000;
+    MC_Relaxation_Steps = 5_000;
+    MC_Equilibrium_Steps = 50_000;
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps;
     """     VARIABLE INITIALIZATION     """
     x, y, z = Float64[], Float64[], Float64[];
@@ -418,16 +418,22 @@ function Energy_Calculation(Patch_Radius::Float64, h::Float64, L::Float64, R_Cut
         Delta_z = abs(rz) - (h / 2 + σ_w)
         r2 = Delta_x^2 + Delta_y^2 + Delta_z^2;
         r_center = sqrt( (- L / 2 - 3σ_w + (i_x - 1) * 2σ_w)^2 + (- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w)^2)
-        if sqrt(r_center) < Patch_Radius
+        if r_center < Patch_Radius
             Energy += u_SquareWell(r2, σ_w, λ_w, 1.0);
         else
             Energy += u_SquareWell(r2, σ_w, λ_w, 0.0);
         end
+
         Delta_x = rx - (- L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w);
         Delta_y = ry - (- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w);
         Delta_z = abs(rz) - (h / 2 + σ_w)
         r2 = Delta_x^2 + Delta_y^2 + Delta_z^2;
-        Energy += u_SquareWell(r2, σ_w, λ_w);
+        r_center = sqrt( (- L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w)^2 + ((- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w))^2 );
+        if r_center < Patch_Radius
+            Energy += u_SquareWell(r2, σ_w, λ_w, 1.0);
+        else
+            Energy += u_SquareWell(r2, σ_w, λ_w, 0.0);
+        end
         if Energy == Inf
             return Energy
         end
@@ -785,7 +791,7 @@ function Cycled_Mezei()
     σ_p, λ_p = 0.5, 1.5;
     σ_w, λ_w = 0.5, 1.5;
 
-    Patch_Percentage = 80
+    Patch_Percentage = 50;
 
     Mean_Density = zeros(Float64, length(H));
     Std_Density = zeros(Float64, length(H));

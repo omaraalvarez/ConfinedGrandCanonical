@@ -76,7 +76,7 @@ end
 function MarkovChainMonteCarlo_Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Number_Run::Int64, Total_Run::Int64, Patch_Percentage::Int64, Patch_Radius::Float64, Bulk_Density::Float64, R_Cut::Float64 = 3.)
     ####################################################     CONFIGURATIONAL STEPS   ################################################################
     V = (h + 2σ_w) * L^2;
-    MC_Measurement = convert(Int64, ceil( 1V ));
+    MC_Measurement = convert(Int64, ceil( 8V ));
     MC_Relaxation_Measurement = 1_000;
     MC_Equilibrium_Measurement = 10_000;
     MC_Relaxation_Steps = MC_Measurement * MC_Relaxation_Measurement;
@@ -507,25 +507,29 @@ function Energy_Calculation(Patch_Radius::Float64, h::Float64, L::Float64, R_Cut
         y_Index = ceil((ry + L / 2) / (2 * √3 * σ_w) + √3);
 
         for i_y = y_Index - 2:y_Index + 2, i_x = x_Index - 2:x_Index + 2
-            if - L / 2 - 3σ_w + (i_x - 1) * 2σ_w < rx + λ_w && - L / 2 - 3σ_w + (i_x - 1) * 2σ_w > rx - λ_w
-                    if - L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w < ry + λ_w && - L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w > ry - λ_w
-                        Delta_x = rx - (- L / 2 - 3σ_w + (i_x - 1) * 2σ_w);
-                        Delta_y = ry - (- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w);
+            x_Position = - L / 2 - 3σ_w + (i_x - 1) * 2σ_w;
+            y_Position = - L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w;
+            if x_Position < rx + λ_w && x_Position > rx - λ_w
+                    if y_Position < ry + λ_w && y_Position > ry - λ_w
+                        Delta_x = rx - x_Position;
+                        Delta_y = ry - y_Position;
                         Delta_z = abs(rz) - (h / 2 + σ_w)
                         r2 = Delta_x^2 + Delta_y^2 + Delta_z^2;
-                        r_center = sqrt( (- L / 2 - 3σ_w + (i_x - 1) * 2σ_w)^2 + (- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w)^2)
+                        r_center = sqrt( (x_Position)^2 + (y_Position)^2)
                         r_center < Patch_Radius ? Energy += u_SquareWell(r2, σ_w, λ_w, 1.0) : Energy += u_SquareWell(r2, σ_w, λ_w, 0.0)
                         Energy == Inf ? (return Energy) : nothing
                     end
             end
 
-            if - L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w < rx + λ_w && - L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w > rx - λ_w
-                    if - L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w < ry + λ_w && - L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w > ry - λ_w
-                        Delta_x = rx - (- L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w);
-                        Delta_y = ry - (- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w);
+            x_Position = - L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w;
+            y_Position = - L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w;
+            if x_Position < rx + λ_w && x_Position > rx - λ_w
+                    if y_Position < ry + λ_w && y_Position > ry - λ_w
+                        Delta_x = rx - x_Position;
+                        Delta_y = ry - y_Position;
                         Delta_z = abs(rz) - (h / 2 + σ_w)
                         r2 = Delta_x^2 + Delta_y^2 + Delta_z^2;
-                        r_center = sqrt( (- L / 2 - 3σ_w + (i_x - 1) * 2σ_w + σ_w)^2 + ((- L / 2 - 3σ_w + (i_y - 1) * √3 * 2σ_w + √3 * σ_w))^2 );
+                        r_center = sqrt( (x_Position)^2 + (y_Position)^2 );
                         r_center < Patch_Radius ? Energy += u_SquareWell(r2, σ_w, λ_w, 1.0) : Energy += u_SquareWell(r2, σ_w, λ_w, 0.0);
                         Energy == Inf ? (return Energy) : nothing
                     end
@@ -546,6 +550,7 @@ function Energy_Calculation(Patch_Radius::Float64, h::Float64, L::Float64, R_Cut
                 Energy += u_SquareWell(r2, σ_p, λ_p);
             end
         end
+        Energy == Inf ? (return Energy) : nothing
     end
 
     return Energy
@@ -562,12 +567,7 @@ function u_SquareWell(r2::Float64, σ::Float64, λ::Float64, e::Float64 = 1.)
 end
 
 function PeriodicBoundaryConditions(L::Float64, x::Float64)
-    if x < - L / 2.
-        x += L;
-    elseif x > L / 2.
-        x -= L;
-    end
-    return x
+    return x - L * round(x / L)
 end
 
 function Random_Excluded_Volume(Overlap::Float64, h::Float64, L::Float64, σ_w::Float64, Pc::Dict{Int64, Float64}, Pc_Sum::Dict{Int64, Float64}, Pc_N::Dict{Int64, Int64}, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})

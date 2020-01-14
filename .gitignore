@@ -1,6 +1,8 @@
 #Output route
 Output
 Output_Julia_Older
+Output_BACKUP
+Output_UPDATING
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

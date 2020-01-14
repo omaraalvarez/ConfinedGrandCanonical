@@ -6,10 +6,10 @@ using CSV;
 using StatsPlots;
 using Distributions;
 
-function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Number_Run::Int64, Total_Run::Int64, Patch_Percentage::Int64, Bulk_Density::Float64, R_Cut::Float64 = 3.)
+function MarkovChainMonteCarlo_Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Number_Run::Int64, Total_Run::Int64, Patch_Percentage::Int64, Bulk_Density::Float64, R_Cut::Float64 = 3.)
     V = (h + 2σ_w) * L^2;
     N_Bins = 200;
-    MC_Measurement = convert(Int64, ceil( 8V ));
+    MC_Measurement = convert(Int64, ceil( 1V ));
     MC_Relaxation_Measurement = 1_000;
     MC_Equilibrium_Measurement = 10_000;
     """     CONFIGURATIONAL STEPS       """
@@ -96,7 +96,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
             println("   Rejected: $N_Removal_Rejected ($(round(100N_Removal_Rejected / N_Removal, digits = 2))%)")
             println("")
 
-            println(Displacement_File, "$(convert(Int64, floor(100i / MC_Relaxation_Steps)))\t$(round(100N_Displacement_Accepted / N_Displacement, digits = 2))")
+            println(Displacement_File, "$(convert(Int64, floor(100i / MC_Relaxation_Steps)))\t$(round(100N_Movement_Accepted / N_Movement, digits = 2))")
             println(Insertion_File, "$(convert(Int64, floor(100i / MC_Relaxation_Steps)))\t$(round(100N_Insertion_Accepted / N_Insertion, digits = 2))")
             println(Removal_File, "$(convert(Int64, floor(100i / MC_Relaxation_Steps)))\t$(round(100N_Removal_Accepted / N_Removal, digits = 2))")
             N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0;
@@ -129,7 +129,7 @@ function Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float
             println("   Accepted: $N_Removal_Accepted ($(round(100N_Removal_Accepted / N_Removal, digits = 2))%)")
             println("   Rejected: $N_Removal_Rejected ($(round(100N_Removal_Rejected / N_Removal, digits = 2))%)")
             println("")
-            println(Displacement_File, "$(convert(Int64, floor(100 + 100i / MC_Relaxation_Steps)))\t$(round(100N_Displacement_Accepted / N_Displacement, digits = 2))")
+            println(Displacement_File, "$(convert(Int64, floor(100 + 100i / MC_Relaxation_Steps)))\t$(round(100N_Movement_Accepted / N_Movement, digits = 2))")
             println(Insertion_File, "$(convert(Int64, floor(100 + 100i / MC_Relaxation_Steps)))\t$(round(100N_Insertion_Accepted / N_Insertion, digits = 2))")
             println(Removal_File, "$(convert(Int64, floor(100 + 100i / MC_Relaxation_Steps)))\t$(round(100N_Removal_Accepted / N_Removal, digits = 2))")
             N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0;
@@ -600,6 +600,8 @@ function Random_Excluded_Volume(Overlap::Float64, h::Float64, L::Float64, σ_w::
                     break
                 end
             end
+        end
+        if Control == false
             N_in += 1;
             append!(x_Insertion, x_V)
             append!(y_Insertion, y_V)
@@ -887,7 +889,7 @@ end
 function Cycled_Mezei()
     ChemPot = -4.150918;
     L = 20.;
-    T = 1.5;
+    T = 2.;
     Bulk_Density = 0.1;
     H = range(2., 10., step = 1.);
     σ_p, λ_p = 0.5, 1.5;
@@ -921,7 +923,7 @@ function Cycled_Mezei()
     Energy_File = open("$Output_Route/Energy_T_$(T).dat", "w");
     println(Energy_File, "h\tEnergy\tStandardDeviation")
     for h in H
-        Mean_Energy[j], Std_Energy[j], Mean_Density[j], Std_Density[j], p_Energy[j], p_Histogram_Energy[j], p_Average_Energy[j], p_Density[j], p_Histogram_Density[j], p_Average_Density[j], p_x[j], p_y[j], p_z[j], p_Normalized_x[j], p_Normalized_y[j], p_Normalized_z[j] = Mezei(ChemPot, h, L, T, σ_p, λ_p, σ_w, λ_w, j, length(H), Patch_Percentage, Bulk_Density);
+        Mean_Energy[j], Std_Energy[j], Mean_Density[j], Std_Density[j], p_Energy[j], p_Histogram_Energy[j], p_Average_Energy[j], p_Density[j], p_Histogram_Density[j], p_Average_Density[j], p_x[j], p_y[j], p_z[j], p_Normalized_x[j], p_Normalized_y[j], p_Normalized_z[j] = MarkovChainMonteCarlo_Mezei(ChemPot, h, L, T, σ_p, λ_p, σ_w, λ_w, j, length(H), Patch_Percentage, Bulk_Density);
         println(Density_File, "$h\t$(Mean_Density[j])\t$(Std_Density[j])")
         println(Energy_File, "$h\t$(Mean_Energy[j])\t$(Std_Energy[j])")
         j += 1;

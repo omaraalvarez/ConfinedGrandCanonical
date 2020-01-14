@@ -84,7 +84,9 @@ function MarkovChainMonteCarlo_Mezei(ChemPot::Float64, h::Float64, L::Float64, T
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps;
 
     ####################################################     ARRAY  INITIALIZATION   ################################################################
-    N_Bins, Beta = 200, 1. / T;
+    Beta = 1. / T;
+    Delta_Bins = 0.02
+    Nxy_Bins, Nz_Bins = convert(Int64, ceil(L / Delta_Bins)), convert(Int64, ceil((h + 2σ_w) / Delta_Bins));
     x, y, z = Float64[], Float64[], Float64[];
     Pc_Random, Pc_Random_Sum, Pc_Random_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
     #Pc_Grid, Pc_Grid_Sum, Pc_Grid_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
@@ -97,12 +99,13 @@ function MarkovChainMonteCarlo_Mezei(ChemPot::Float64, h::Float64, L::Float64, T
     Energy_Array, Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
     Mean_Energy_Array, Mean_Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
     Std_Energy, Std_Density = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ); 
-    g_x, g_y, g_z = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ), N_Bins), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ), N_Bins), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ), N_Bins);
-    PotentialFunction = zeros(Float64, N_Bins);
+    g_x, g_y, g_z = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ), Nxy_Bins), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ), Nxy_Bins), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ), Nz_Bins);
+    PotentialFunction = zeros(Float64, Nz_Bins);
 
     ####################################################     OUTPUT ROUTE AND FILES   ################################################################
     Output_Route = pwd() * "/Output_UPDATING/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/Patch_$Patch_Percentage%/h_$(h)"
     mkpath("$Output_Route/Positions")
+    mkpath("$Output_Route/Configurations")
     Acceptance_File = open("$Output_Route/Acceptance.dat", "w");
     println(Acceptance_File, "N\tMovement\tInsertion\tRemoval")
     ####################################################     SLAB CREATION   ################################################################
@@ -179,7 +182,35 @@ function MarkovChainMonteCarlo_Mezei(ChemPot::Float64, h::Float64, L::Float64, T
             N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0;
         end
 
-        ####################################################    SAVES POSITIONS OF THE MOLECULES   ################################################################
+
+
+        
+        if i == MC_Relaxation_Steps
+            Pc_Random_Array = zeros(Float64, length(Pc_Random) - 1)
+            Pc_Density = zeros(Float64, length(Pc_Random_Array))
+            @inbounds for i in keys(Pc_Random)
+                if i != 0
+                    Pc_Random_Array[i] = Pc_Random[i];
+                end
+            end
+            Pc_File = open("$Output_Route/Cavity_Probability_Relaxation.dat", "w");
+            println(Pc_File, "Density\tPc_Random")
+            @inbounds for i = 1:length(Pc_Random_Array)
+                Pc_Density[i] = i / V;
+                println(Pc_File, "$(Pc_Density[i])\t$(round(Pc_Random_Array[i], digits = 6))")
+                #println(Pc_File, "$i\t$(round(Pc_Array[i], digits = 6))\t$(round(Pc_Grid_Array[i], digits = 6))\t$(round(Pc_Analytic_Array[i], digits = 6))")
+            end
+            close(Pc_File)
+            Cavity_Probability_Plot = plot(Pc_Density, Pc_Random_Array, xlabel = "Density", ylabel = "Cavity Probability", ylim = (0, 1), title = "Slit Separation = $h. RELAXATION", titlefontsize = 25, legend = false, framestyle = :box, width = 3, guidefontsize = 20, tickfontsize = 18,  left_margin = 5mm, bottom_margin = 5mm, top_margin = 5mm, widen = true, size = [1920, 1080], dpi = 300)
+            savefig(Cavity_Probability_Plot, "$Output_Route/Cavity_Probability_RELAXATION_Plot")
+        end
+
+
+
+
+
+
+        ####################################################    SAVES POSITIONS OF THE MOLECULES FOR THE POVRAY IMAGES  ################################################################
         if i > MC_Relaxation_Steps && i % .1MC_Equilibrium_Steps == 0
             Positions_File = open("$Output_Route/Positions/Pos_$N_Image.xyz", "w");
             for i = 1:length(x)
@@ -243,11 +274,21 @@ function MarkovChainMonteCarlo_Mezei(ChemPot::Float64, h::Float64, L::Float64, T
                 end
                 Mean_Energy_Array[N_Measurements] = mean(Energy_Array[1:N_Measurements]);
                 Mean_Density_Array[N_Measurements] = mean(Density_Array[1:N_Measurements]);
-                g_x[N_Measurements, :] = Distribution(N_Bins, L, x);
-                g_y[N_Measurements, :] = Distribution(N_Bins, L, y);
-                g_z[N_Measurements, :] = Distribution(N_Bins, h + 2σ_w, z);
-                PotentialFunction += Potential(Patch_Radius, N_Bins, L, h, σ_w, λ_w, x, y, z)
+                g_x[N_Measurements, :] = Distribution(Nxy_Bins, L, x);
+                g_y[N_Measurements, :] = Distribution(Nxy_Bins, L, y);
+                g_z[N_Measurements, :] = Distribution(Nz_Bins, h + 2σ_w, z);
+                PotentialFunction += Potential(Patch_Radius, Nz_Bins, L, h, σ_w, λ_w, x, y, z)
+
+                ####################################################    SAVES POSITIONS OF THE MOLECULES    ################################################################
+                Configurations_File = open("$Output_Route/Configurations/Conf_$N_Measurements.xyz", "w");
+                println(Positions_File, "x\ty\tz")
+                for i = 1:length(x)
+                    println(Positions_File, "$(x[i])\t$(y[i])\t$(z[i])")
+                end
+                close(Configurations_File)
             end
+
+            ####################################################    MAX DISPLACEMENT CONTROL  ################################################################
             if N_Displacement_Accepted / N_Displacement > 0.55
                 Max_Displacement *= 1.05
                 Max_Displacement_Z *= 1.05
@@ -287,20 +328,20 @@ function MarkovChainMonteCarlo_Mezei(ChemPot::Float64, h::Float64, L::Float64, T
         close(Mean_Density_File)
     
         ####################################################    DISTRIBUTION PROFILES AND SLAB POTENTIAL  ################################################################
-        Delta_xy, Delta_z = L / N_Bins, (h + 2σ_w) / N_Bins;
-        r_xy, r_z = zeros(Float64, N_Bins), zeros(Float64, N_Bins);
+        Delta_xy, Delta_z = L / Nxy_Bins, (h + 2σ_w) / Nz_Bins;
+        r_xy, r_z = zeros(Float64, Nxy_Bins), zeros(Float64, Nz_Bins);
 
-        g_x *= (N_Bins / V);
+        g_x *= (Nxy_Bins / V);
         g_x_Mean, g_x_Std = mean(g_x, dims = 1)', std(g_x, dims = 1)';
         g_x_Normalized = g_x ./ Bulk_Density;
         g_x_Normalized_Mean, g_x_Normalized_Std = mean(g_x_Normalized, dims = 1)', std(g_x_Normalized, dims = 1)';
 
-        g_y *= (N_Bins / V);
+        g_y *= (Nxy_Bins / V);
         g_y_Mean, g_y_Std = mean(g_y, dims = 1)', std(g_y, dims = 1)';
         g_y_Normalized = g_y ./ Bulk_Density;
         g_y_Normalized_Mean, g_y_Normalized_Std = mean(g_y_Normalized, dims = 1)', std(g_y_Normalized, dims = 1)';
 
-        g_z *= (N_Bins / V);
+        g_z *= (Nz_Bins / V);
         g_z_Mean, g_z_Std = mean(g_z, dims = 1)', std(g_z, dims = 1)';
         g_z_Normalized = g_z ./ Bulk_Density; 
         g_z_Normalized_Mean, g_z_Normalized_Std = mean(g_z_Normalized, dims = 1)', std(g_z_Normalized, dims = 1)';
@@ -310,16 +351,22 @@ function MarkovChainMonteCarlo_Mezei(ChemPot::Float64, h::Float64, L::Float64, T
         PotentialFunction /= N_Measurements;
 
         Density_Distribution_File = open("$Output_Route/Density_Distribution.dat", "w");
+        Density_Distribution_Z_File = open("$Output_Route/Density_Distribution_Z.dat", "w");
         Potential_File = open("$Output_Route/Potential_Function.dat", "w")
-        println(Density_Distribution_File, "r_xy\tDensity_x\tStd_x\tNormalized_Density_x\tStd_Normalized_x\tDensity_y\tStd_y\tNormalized_Density_y\tStd_Normalized_y\tr_z\tDensity_z\tStd_z\tNormalized_Density_z\tStd_Normalized_z")
+        println(Density_Distribution_File, "r_xy\tDensity_x\tStd_x\tNormalized_Density_x\tStd_Normalized_x\tDensity_y\tStd_y\tNormalized_Density_y\tStd_Normalized_y")
+        println(Density_Distribution_Z_File, "r_z\tDensity_z\tStd_z\tNormalized_Density_z\tStd_Normalized_z")
         println(Potential_File, "z\tU_wall(r)")
-        @inbounds for i = 1:N_Bins
+        @inbounds for i = 1:Nxy_Bins
             r_xy[i] = round( - L / 2 + (i - 0.5) * Delta_xy, digits = 6);
+            println(Density_Distribution_File, "$(r_xy[i])\t$(round(g_x_Mean[i], digits = 6))\t$(round(g_x_Std[i], digits = 6))\t$(round(g_x_Normalized_Mean[i], digits = 6))\t$(round(g_x_Normalized_Std[i], digits = 6))\t$(round(g_y_Mean[i], digits = 6))\t$(round(g_y_Std[i], digits = 6))\t$(round(g_y_Normalized_Mean[i], digits = 6))\t$(round(g_y_Normalized_Std[i], digits = 6))")
+        end
+        @inbounds for i = 1:Nz_Bins
             r_z[i] = round( - (h + 2σ_w) / 2 + (i - 0.5) * Delta_z, digits = 6);
-            println(Density_Distribution_File, "$(r_xy[i])\t$(round(g_x_Mean[i], digits = 6))\t$(round(g_x_Std[i], digits = 6))\t$(round(g_x_Normalized_Mean[i], digits = 6))\t$(round(g_x_Normalized_Std[i], digits = 6))\t$(round(g_y_Mean[i], digits = 6))\t$(round(g_y_Std[i], digits = 6))\t$(round(g_y_Normalized_Mean[i], digits = 6))\t$(round(g_y_Normalized_Std[i], digits = 6))\t$(r_z[i])\t$(round(g_z_Mean[i], digits = 6))\t$(round(g_z_Std[i], digits = 6))\t$(round(g_z_Normalized_Mean[i], digits = 6))\t$(round(g_z_Normalized_Std[i], digits = 6))")
+            println(Density_Distribution_Z_File, "$(r_z[i])\t$(round(g_z_Mean[i], digits = 6))\t$(round(g_z_Std[i], digits = 6))\t$(round(g_z_Normalized_Mean[i], digits = 6))\t$(round(g_z_Normalized_Std[i], digits = 6))")
             println(Potential_File, "$(r_z[i])\t$(round(PotentialFunction[i], digits = 6))")
         end
         close(Density_Distribution_File)
+        close(Density_Distribution_Z_File)
         close(Potential_File)
 
         Distribution_X_Plot = Distributions_Plots("Density_Distribution_X", r_xy, g_x_Mean, g_x_Std, g_z_Max, h, Output_Route, true)

@@ -6,6 +6,7 @@ Plot_Summary.jl
 Plotting.jl
 PovRay_Backup.jl
 Slab_Creation.jl
+Python_Mezei_Confined.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

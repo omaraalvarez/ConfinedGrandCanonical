@@ -7,16 +7,15 @@ using Test;
 using CSV;
 
 function Pore_Separation()
-    ChemPot = -4.150918;
+    ChemPot = -3.375067;
     L = 20.;
     T = 1.5;
-    Bulk_Density = 0.1;
-    H = range(10., 10., step = 1.);
-    #H = range(2., 10., step = 1.);
+    Bulk_Density = 0.3;
+    H = range(2., 10., step = 1.);
     σ_p, λ_p = 0.5, 1.5;
     σ_w, λ_w = 0.5, 1.5;
 
-    Patch_Percentage = 1000;
+    Patch_Percentage = 0;
     Patch_Radius = round(sqrt(L^2 * Patch_Percentage / 314) , digits = 6)
 
     Mean_Energy = zeros(Float64, length(H));
@@ -77,9 +76,9 @@ end
 function MarkovChainMonteCarlo_Mezei(ChemPot::Float64, h::Float64, L::Float64, T::Float64, σ_p::Float64, λ_p::Float64, σ_w::Float64, λ_w::Float64, Number_Run::Int64, Total_Run::Int64, Patch_Percentage::Int64, Patch_Radius::Float64, Bulk_Density::Float64, R_Cut::Float64 = 3.)
     ####################################################     CONFIGURATIONAL STEPS   ################################################################
     V = (h + 2σ_w) * L^2;
-    MC_Measurement = convert(Int64, ceil( 1V ));
-    MC_Relaxation_Measurement = 1000#1_000;
-    MC_Equilibrium_Measurement = 1000#10_000;
+    MC_Measurement = convert(Int64, ceil( 4V ));
+    MC_Relaxation_Measurement = 1_500;
+    MC_Equilibrium_Measurement = 20_000;
     MC_Relaxation_Steps = MC_Measurement * MC_Relaxation_Measurement;
     MC_Equilibrium_Steps = MC_Measurement * MC_Equilibrium_Measurement;
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps;
@@ -352,9 +351,9 @@ function MarkovChainMonteCarlo_Mezei(ChemPot::Float64, h::Float64, L::Float64, T
         Distribution_Z_Plot = Distributions_Plots("Density_Distribution_Z", r_z, g_z_Mean, g_z_Std, g_z_Max, h, Output_Route, true)
         Distribution_X_Plot, Distribution_Y_Plot, Distribution_Z_Plot = Distribution_Plot_Unified("Density_Distribution", "Density", Distribution_X_Plot, Distribution_Y_Plot, Distribution_Z_Plot, Output_Route)
 
-        Normalized_Distribution_X_Plot = Distributions_Plots("Normalized_Density_Distribution_X", r_xy, g_x_Mean, g_x_Std, g_z_Max, h, Output_Route, false)
-        Normalized_Distribution_Y_Plot = Distributions_Plots("Normalized_Density_Distribution_Y", r_xy, g_y_Mean, g_y_Std, g_z_Max, h, Output_Route, false)
-        Normalized_Distribution_Z_Plot = Distributions_Plots("Normalized_Density_Distribution_Z", r_z, g_z_Mean, g_z_Std, g_z_Max, h, Output_Route, false)
+        Normalized_Distribution_X_Plot = Distributions_Plots("Normalized_Density_Distribution_X", r_xy, g_x_Normalized_Mean, g_x_Normalized_Std, g_z_Normalized_Max, h, Output_Route, false)
+        Normalized_Distribution_Y_Plot = Distributions_Plots("Normalized_Density_Distribution_Y", r_xy, g_y_Normalized_Mean, g_y_Normalized_Std, g_z_Normalized_Max, h, Output_Route, false)
+        Normalized_Distribution_Z_Plot = Distributions_Plots("Normalized_Density_Distribution_Z", r_z, g_z_Normalized_Mean, g_z_Normalized_Std, g_z_Normalized_Max, h, Output_Route, false)
         Normalized_Distribution_X_Plot, Normalized_Distribution_Y_Plot, Normalized_Distribution_Z_Plot = Distribution_Plot_Unified("Normalized_Density_Distribution", "Normalized Density", Normalized_Distribution_X_Plot, Normalized_Distribution_Y_Plot, Normalized_Distribution_Z_Plot, Output_Route)
 
         Potential_Plot = plot(r_z, PotentialFunction, xlabel = "Z Axis", ylabel = "U_Wall(r)", title = "Slit Separation = $h", titlefontsize = 25, legend = false, framestyle = :box, width = 3, guidefontsize = 20, tickfontsize = 18,  left_margin = 5mm, bottom_margin = 5mm, top_margin = 5mm, widen = true, size = [1920, 1080], dpi = 300)
@@ -598,6 +597,10 @@ end
 function Random_Excluded_Volume(Equilibrium::Bool, N_Random::Int64, Overlap::Float64, h::Float64, L::Float64, σ_w::Float64, Pc::Dict{Int64, Float64}, Pc_Sum::Dict{Int64, Float64}, Pc_N::Dict{Int64, Int64}, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
     N_in = 0;
     x_Insertion, y_Insertion, z_Insertion = Float64[], Float64[], Float64[];
+    if !haskey(Pc, length(x))
+            Equilibrium = false;
+            N_Random = 1000;
+    end
     @inbounds for i = 1:N_Random
         Control = false;
         z_V = (h + 2σ_w) * (rand() - 0.5);

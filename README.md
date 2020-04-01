@@ -5,8 +5,9 @@
 Semi-interactive code for the simulation of confined fluids, under graphene-slit-like walls, in the μVT ensemble according to Mezei's Cavity-Biased algorithm for the efficient insertion of high-density systems.
 
 Code is designed for the calculation of the thermal (i.e. energy per particle, adsorption, density distribution, etc) and structural properties for mixtures of monoatomic molecules confined by hexagonally arranged molecules constituting a slit-like wall, each of these having a square-well potential of interaction.
-
-![Hexagonal Arrangement of Walls](img/HCP.png){width = 50%}
+<center>
+    <img src="img/HCP.png" width="50%">
+</center>
 
 Generation of states goes according to the Cavity-Biased method with equal chances for the insertion, removal and displacement of molecules as encapsulated in this scheme:
 

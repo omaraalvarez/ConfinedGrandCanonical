@@ -6,7 +6,7 @@ Semi-interactive code for the simulation of confined fluids, under graphene-slit
 
 Code is designed for the calculation of the thermal (i.e. energy per particle, adsorption, density distribution, etc) and structural properties for mixtures of monoatomic molecules confined by hexagonally arranged molecules constituting a slit-like wall, each of these having a square-well potential of interaction.
 
-![Hexagonal Arrangement of Walls](img/HCP.png)
+![Hexagonal Arrangement of Walls](img/HCP.png){width = 50%}
 
 Generation of states goes according to the Cavity-Biased method with equal chances for the insertion, removal and displacement of molecules as encapsulated in this scheme:
 
@@ -20,15 +20,15 @@ Execution is straightforward by parsing arguments:
     usage: Confined_GrandCanonical.jl [-D Ρ_BULK] [-C CONFIGURATIONS] [-P POVRAY] [-h] μ T h
 
     positional arguments:
-    μ                     Chemical Potental (type: Float64)
-    T                     Temperature (type: Float64)
-    h                     Slit's Separation (type: Float64)
+        μ                     Chemical Potental (type: Float64)
+        T                     Temperature (type: Float64)
+        h                     Slit's Separation (type: Float64)
 
     optional arguments:
-    -D, --ρ_Bulk          Bulk fluid's density (type: Float64, default: 1.0)
-    -C, --Configurations  Enable/Disable Saving Configuraitons (type: Bool, default: false)
-    -P, --PovRay          Enable/Disable PovRay Animations (type: Bool, default: false)
-    -h, --help            show this help message and exit
+        -D, --ρ_Bulk          Bulk fluid's density (type: Float64, default: 1.0)
+        -C, --Configurations  Enable/Disable Saving Configuraitons (type: Bool, default: false)
+        -P, --PovRay          Enable/Disable PovRay Animations (type: Bool, default: false)
+        -h, --help            show this help message and exit
 
 Three of these are mandatory: 
 
